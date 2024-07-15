@@ -7,6 +7,7 @@ target_sources(bgr_ir INTERFACE
     ir_receiver.cpp)
 
 target_link_libraries(bgr_ir INTERFACE
+    bgr_util
     hardware_gpio
     hardware_irq
     hardware_timer

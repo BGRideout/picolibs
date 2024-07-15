@@ -13,7 +13,9 @@ uint32_t    IR_Receiver::n_rcvr_ = 0;
 uint32_t    IR_Receiver::mx_rcvr_ = 4;
 
 IR_Receiver::IR_Receiver(uint32_t gpio, uint16_t address, uint32_t base_pulse, std::size_t n_pulse)
- : gpio_(gpio), n_pulse_(0), mx_pulse_(n_pulse), base_pulse_(base_pulse), address_(address), sync_(0)
+  : gpio_(gpio), n_pulse_(0), mx_pulse_(n_pulse), base_pulse_(base_pulse), address_(address), sync_(0),
+    rcb_(nullptr), rpt_(nullptr), rpt_addr_(0), rpt_func_(0),
+    tmo_(nullptr), msg_timer_(-1), bit_timer_(-1), msg_timeout_(0), bit_timeout_(0), prev_count_(0)
 {
     if (receivers_ == nullptr)
     {
@@ -46,6 +48,8 @@ IR_Receiver::IR_Receiver(uint32_t gpio, uint16_t address, uint32_t base_pulse, s
 
 IR_Receiver::~IR_Receiver()
 {
+    if (bit_timer_ != -1) cancel_alarm(bit_timer_);
+    if (msg_timer_ != -1) cancel_alarm(msg_timer_);
     gpio_set_irq_enabled(gpio_, GPIO_IRQ_EDGE_FALL|GPIO_IRQ_EDGE_RISE, false);
     gpio_deinit(gpio_);
     n_rcvr_ -= 1;
@@ -84,36 +88,31 @@ void IR_Receiver::gpio_cb(uint gpio, uint32_t evmask)
 
 void IR_Receiver::store_timestamp(uint64_t ts, bool falling)
 {
+    uint8_t psy = sync_;
     if (check_sync(ts, falling))
     {
         if (n_pulse_ < mx_pulse_)
         {
-            uint32_t delta = ts - pulses_[n_pulse_];
-            if (delta > base_pulse_ * 5)
-            {
-                pulses_[n_pulse_++] = ts;
-            }
-            else
-            {
-                message_error();
-            }
+            pulses_[n_pulse_++] = ts;
         }
         else
         {
             message_complete(ts);
         }
     }
+    if (psy == 0 && sync_ != 0)
+    {
+        start_timeout();
+    }
 }
 
 void IR_Receiver::message_complete(uint64_t ts)
 {
-    uint16_t addr;
-    uint16_t func;
-    if (decode_message(addr, func))
+    if (decode_message(rpt_addr_, rpt_func_))
     {
         if (rcb_)
         {
-            rcb_(ts, addr, func);
+            rcb_(ts, rpt_addr_, rpt_func_);
         }
         reset();
     }
@@ -121,6 +120,62 @@ void IR_Receiver::message_complete(uint64_t ts)
     {
         message_error();
     }
+}
+
+void IR_Receiver::start_timeout()
+{
+    if (msg_timeout_ > 0)
+    {
+        msg_timer_ = add_alarm_in_ms(msg_timeout_, timeout_msg, this, true);
+    }
+    if (bit_timeout_ > 0)
+    {
+        prev_count_ = n_pulse_;
+        bit_timer_ = add_alarm_in_ms(bit_timeout_, timeout_bit, this, true);
+    }
+}
+
+int64_t IR_Receiver::timeout_msg(alarm_id_t id, void *user_data)
+{
+    IR_Receiver *self = static_cast<IR_Receiver *>(user_data);
+    if (self->sync_ != 0)
+    {
+        self->timeout(true);
+    }
+    return 0;
+}
+
+int64_t IR_Receiver::timeout_bit(alarm_id_t id, void *user_data)
+{
+    uint64_t ret = 0;
+    IR_Receiver *self = static_cast<IR_Receiver *>(user_data);
+    if (self->sync_ != 0)
+    {
+        if (self->n_pulse_ == self->prev_count_ && self->check_bit_timeout())
+        {
+            ret = self->timeout(false);
+        }
+        else
+        {
+            self->prev_count_ = self->n_pulse_;
+        }
+        ret = self->bit_timeout_ * 1000;
+    }
+    return ret;
+}
+
+bool IR_Receiver::timeout(bool msg)
+{
+    bool ret = false;
+    if (tmo_)
+    {
+        ret = tmo_(msg, n_pulse_, pulses_);
+    }
+    if (!ret)
+    {
+        message_error();
+    }
+    return ret;
 }
 
 void IR_Receiver::message_error()
@@ -132,4 +187,14 @@ void IR_Receiver::reset()
 {
     sync_ = 0;
     n_pulse_ = 0;
+    if (bit_timer_ != -1)
+    {
+        cancel_alarm(bit_timer_);
+        bit_timer_ = -1;
+    }
+    if (msg_timer_ != -1)
+    {
+        cancel_alarm(msg_timer_);
+        msg_timer_ = -1;
+    }
 }

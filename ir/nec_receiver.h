@@ -6,6 +6,7 @@
 #define NEC_RECEIVER
 
 #include "ir_receiver.h"
+#include <stdio.h>
 
 class NEC_Receiver : public IR_Receiver
 {
@@ -33,6 +34,13 @@ protected:
      * @param   func    Word to receive function code
      */
     bool decode_message(uint16_t &addr, uint16_t &func) override;
+
+    /**
+     * @brief   Check bit timeout
+     * 
+     * @return true if bit timeout to be processed
+     */
+    bool check_bit_timeout() override;
 
 public:
     /**

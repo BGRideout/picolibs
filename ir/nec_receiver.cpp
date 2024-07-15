@@ -9,6 +9,7 @@ bool NEC_Receiver::check_sync(uint64_t ts, bool falling)
     bool ret = false;
     if (sync_ == 0)
     {
+        n_pulse_ = 0;
         if (!falling)
         {
             pulses_[0] = ts;
@@ -36,7 +37,17 @@ bool NEC_Receiver::check_sync(uint64_t ts, bool falling)
         }
         else
         {
-            sync_ = 0;
+            reset();
+
+            //  Check for repeat and callback with addr=0, func=0 if found
+            base = base_pulse_ * 4;
+            if (!falling && delta > base - base_pulse_ && delta < base + base_pulse_)
+            {
+                if (rpt_)
+                {
+                    rpt_(ts, rpt_addr_, rpt_func_);
+                }
+            }
         }
     }
     else if (sync_ == 2)
@@ -80,4 +91,9 @@ bool NEC_Receiver::decode_message(uint16_t &addr, uint16_t &func)
         }
     }
     return ret;
+}
+
+bool NEC_Receiver::check_bit_timeout()
+{
+    return sync_ == 2 || bit_timeout_ > 4;
 }

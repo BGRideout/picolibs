@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <pico/types.h>
+#include <pico/time.h>
 
 class IR_Receiver
 {
@@ -14,15 +15,31 @@ public:
     /**
      * @brief   Callback for IR message received
      * 
+     * @details Function is called from interrupt. Keep processing short.
+     * 
      * @param   t   Timestamp of message received
      * @param   a   Address
      * @param   f   Function code
      */
     typedef void (*ir_rcv_callback)(uint64_t t, uint16_t a, uint16_t f);
 
+    /**
+     * @brief   Callback for read timeout
+     * 
+     * @details Function is called from interrupt. Keep processing short.
+     * 
+     * @param   msg         true if message timeout, false if bit / pulse timeout
+     * @param   n_pulse     Number of pulses read
+     * @param   pulses      Pointer to array of pulse times
+     * 
+     * @return true if buffer to be processed, false if message failed
+     */
+    typedef bool (*ir_tmo_callback)(bool msg, uint32_t n_pulse, uint64_t const *pulses);
+
 protected:
     uint32_t            gpio_;          // GPIO number
     uint64_t            *pulses_;       // On / off times
+    uint64_t            *delta_;       // On / off times
     uint32_t            n_pulse_;       // Number of pulses
     uint32_t            mx_pulse_;      // Maimum number of pulses
     uint32_t            base_pulse_;    // Base pulse time
@@ -30,14 +47,29 @@ protected:
     uint8_t             sync_;          // Sync pulse flag
     ir_rcv_callback     rcb_;           // Receive callback
 
+    ir_rcv_callback     rpt_;           // Repeat callback
+    uint16_t            rpt_addr_;      // Repeat address
+    uint16_t            rpt_func_;      // Repeat function
+
+    ir_tmo_callback     tmo_;           // Timeout callback
+    alarm_id_t          msg_timer_;     // Message timer
+    alarm_id_t          bit_timer_;     // Bit receive timeout
+    uint32_t            msg_timeout_;   // Message timeout
+    uint32_t            bit_timeout_;   // Bit timeout
+    uint32_t            prev_count_;    // Previous bit (pulse) count
+
     static IR_Receiver  **receivers_;   // List of receivers
     static uint32_t     n_rcvr_;        // Number of receivers
     static uint32_t     mx_rcvr_;       // Maimum number of receivers
 
     static void gpio_cb(uint gpio, uint32_t evmask);
+    static int64_t timeout_msg(alarm_id_t id, void *user_data);
+    static int64_t timeout_bit(alarm_id_t id, void *user_data);
 
     void store_timestamp(uint64_t ts, bool falling);
     void message_complete(uint64_t ts);
+    void start_timeout();
+    bool timeout(bool msg);
     void message_error();
     void reset();
 
@@ -53,7 +85,8 @@ protected:
      * 
      * @details Can use the sync_ counter to determine when sync occurs.
      *          sync_ set to zero by base class before start of new message
-     *          but otherwise not altered.
+     *          but otherwise not altered. Timeouts started when this
+     *          functurn returns true and sync_ no longer zero.
      * 
      * @param   ts      Timestamp of edge
      * @param   falling True if current edge is falling
@@ -71,6 +104,13 @@ protected:
      * @return  true if successful decode
      */
     virtual bool decode_message(uint16_t &addr, uint16_t &func) = 0;
+
+    /**
+     * @brief   Check bit timeout
+     * 
+     * @return true if bit timeout to be processed
+     */
+    virtual bool check_bit_timeout() { return true; }
 
 public:
     /**
@@ -99,6 +139,35 @@ public:
      * @param   cb      Callback to receive address and function code
      */
     void set_rcv_callback(ir_rcv_callback cb) { rcb_ = cb; }
+
+    /**
+     * @brief   Set callback for IR repeat code received
+     * 
+     * @param   cb      Callback for repeat received. Address and code are from
+     *                  most recent receive
+     */
+    void set_rpt_callback(ir_rcv_callback cb) { rpt_ = cb; }
+
+    /**
+     * @brief   Set callback for IR message timeout
+     * 
+     * @param   cb      Callback to receive timeout notification
+     */
+    void set_tmo_callback(ir_tmo_callback cb) { tmo_ = cb; }
+
+    /**
+     * @brief   Set message timeout
+     * 
+     * @param   tmo_msec    Message timeout in milliseconds
+     */
+    void set_message_timeout(uint32_t tmo_msec) { msg_timeout_ = tmo_msec; }
+
+    /**
+     * @brief   Set bit / pulse timeout
+     * 
+     * @param   tmo_msec    Bit / pulse timeout in milliseconds
+     */
+    void set_bit_timeout(uint32_t tmo_msec) { bit_timeout_ = tmo_msec; }
 };
 
 #endif  
