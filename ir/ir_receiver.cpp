@@ -142,6 +142,7 @@ int64_t IR_Receiver::timeout_msg(alarm_id_t id, void *user_data)
     {
         self->timeout(true);
     }
+    self->msg_timer_ = -1;
     return 0;
 }
 
@@ -160,6 +161,10 @@ int64_t IR_Receiver::timeout_bit(alarm_id_t id, void *user_data)
             self->prev_count_ = self->n_pulse_;
         }
         ret = self->bit_timeout_ * 1000;
+    }
+    if (ret == 0)
+    {
+        self->bit_timer_ = -1;
     }
     return ret;
 }
