@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <pico/types.h>
 #include <pico/time.h>
+#include <pico/sync.h>
 
 class IR_Receiver
 {
@@ -17,11 +18,12 @@ public:
      * 
      * @details Function is called from interrupt. Keep processing short.
      * 
-     * @param   t   Timestamp of message received
-     * @param   a   Address
-     * @param   f   Function code
+     * @param   t           Timestamp of message received
+     * @param   a           Address
+     * @param   f           Function code
+     * @param   obj         IR_Receiver object pointer
      */
-    typedef void (*ir_rcv_callback)(uint64_t t, uint16_t a, uint16_t f);
+    typedef void (*ir_rcv_callback)(uint64_t t, uint16_t a, uint16_t f, IR_Receiver *obj);
 
     /**
      * @brief   Callback for read timeout
@@ -31,19 +33,28 @@ public:
      * @param   msg         true if message timeout, false if bit / pulse timeout
      * @param   n_pulse     Number of pulses read
      * @param   pulses      Pointer to array of pulse times
+     * @param   obj         IR_Receiver object pointer
      * 
      * @return true if buffer to be processed, false if message failed
      */
-    typedef bool (*ir_tmo_callback)(bool msg, uint32_t n_pulse, uint64_t const *pulses);
+    typedef bool (*ir_tmo_callback)(bool msg, uint32_t n_pulse, uint32_t const *pulses, IR_Receiver *obj);
+
+    /**
+     * @brief   Callback for error
+     * 
+     * @details Called if the decode function returns a failure or if a timeout
+     *          occurs without a timeout callback defined
+     * 
+     * @param   obj         IR_Receiver object pointer
+     */
+    typedef void (*ir_error_callback)(IR_Receiver *obj);
 
 protected:
     uint32_t            gpio_;          // GPIO number
-    uint64_t            *pulses_;       // On / off times
-    uint64_t            *delta_;       // On / off times
+    uint32_t            *pulses_;       // On / off times
     uint32_t            n_pulse_;       // Number of pulses
     uint32_t            mx_pulse_;      // Maimum number of pulses
-    uint32_t            base_pulse_;    // Base pulse time
-    uint16_t            address_;       // Receiver address
+    uint64_t            prev_ts_;       // Previous timestamp
     uint8_t             sync_;          // Sync pulse flag
     ir_rcv_callback     rcb_;           // Receive callback
 
@@ -58,19 +69,23 @@ protected:
     uint32_t            bit_timeout_;   // Bit timeout
     uint32_t            prev_count_;    // Previous bit (pulse) count
 
+    ir_error_callback   err_;           // Error callback
+
+    semaphore_t         sem_;           // Semaphore
+
     static IR_Receiver  **receivers_;   // List of receivers
     static uint32_t     n_rcvr_;        // Number of receivers
-    static uint32_t     mx_rcvr_;       // Maimum number of receivers
+    static uint32_t     mx_rcvr_;       // Maximum number of receivers
 
     static void gpio_cb(uint gpio, uint32_t evmask);
     static int64_t timeout_msg(alarm_id_t id, void *user_data);
     static int64_t timeout_bit(alarm_id_t id, void *user_data);
 
     void store_timestamp(uint64_t ts, bool falling);
-    void message_complete(uint64_t ts);
+    virtual void message_complete(uint64_t ts);
     void start_timeout();
-    bool timeout(bool msg);
-    void message_error();
+    virtual bool timeout(bool msg);
+    virtual void message_error();
     void reset();
 
     /*
@@ -112,16 +127,24 @@ protected:
      */
     virtual bool check_bit_timeout() { return true; }
 
+    /**
+     * @brief   Compare pulse time
+     * 
+     * @param   pulse       Pulse time
+     * @param   nom_pulse   Nominal pulse for compare
+     * @param   band        Band either side of numinal pulse
+     */
+    static inline bool compare_pulse(uint32_t pulse, uint32_t nom_pulse, uint32_t band)
+                        {return pulse > nom_pulse - band && pulse < nom_pulse + band; }
+
 public:
     /**
      * @brief   Constructor for IR Receiver class
      * 
      * @param   gpio        GPIO numver for reading input
-     * @param   address     Address to which this receiver responds (0xffff = all)
-     * @param   base_pulse  Base pulse time in microseconds
      * @param   n_pulse     Number of values reserved for pulse times
      */
-    IR_Receiver(uint32_t gpio, uint16_t address, uint32_t base_pulse, std::size_t n_pulse);
+    IR_Receiver(uint32_t gpio, uint32_t n_pulse);
 
     /**
      * @brief   Destructor for IR Receiver class
@@ -156,6 +179,13 @@ public:
     void set_tmo_callback(ir_tmo_callback cb) { tmo_ = cb; }
 
     /**
+     * @brief   Set callback for IR message error
+     * 
+     * @param   cb      Callback to receive error notification
+     */
+    void set_err_callback(ir_error_callback cb) { err_ = cb; }
+
+    /**
      * @brief   Set message timeout
      * 
      * @param   tmo_msec    Message timeout in milliseconds
@@ -168,6 +198,15 @@ public:
      * @param   tmo_msec    Bit / pulse timeout in milliseconds
      */
     void set_bit_timeout(uint32_t tmo_msec) { bit_timeout_ = tmo_msec; }
+
+    /**
+     * @brief   Wait for next message completion
+     * 
+     * @param   timeout_ms  Maimum time to wait (milliseconds)
+     * 
+     * @return  true if message complete, false if timed out waiting
+     */
+    bool wait_for_message(uint32_t timeout_ms=0);
 };
 
 #endif  

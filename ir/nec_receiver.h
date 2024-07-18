@@ -6,11 +6,14 @@
 #define NEC_RECEIVER
 
 #include "ir_receiver.h"
-#include <stdio.h>
+
+#define NEC_BASE_PULSE 562
+#define NEC_MESSAGE_LEN 67
 
 class NEC_Receiver : public IR_Receiver
 {
 private:
+    uint32_t    address_;           // Address to which object responds (0xffff = all)
 
 protected:
     /**
@@ -49,8 +52,21 @@ public:
      * @param   gpio        GPIO numver for reading input
      * @param   address     Address to which this receiver responds (0xffff = all)
      */
-    NEC_Receiver(uint32_t gpio, uint32_t address=0xffff) : IR_Receiver(gpio, address, 562, 65) {}
+    NEC_Receiver(uint32_t gpio, uint32_t address=0xffff) : IR_Receiver(gpio, NEC_MESSAGE_LEN), address_(address) {}
     ~NEC_Receiver() {}
+
+    /**
+     * @brief   Decode series of pulses
+     * 
+     * @param   pulses      Pointer to vector of pulse times
+     * @param   n_pulse     Number of pulses
+     * @param   addr        Variable to receive address
+     * @param   func        Variable to receive function
+     * @param   address     Address to match (0xffff = all)
+     * 
+     * @return  true if successful
+     */
+    static bool decode(uint32_t const *pulses, uint32_t n_pulse, uint16_t &addr, uint16_t &func, uint16_t address=0xffff);
 };
 
 #endif

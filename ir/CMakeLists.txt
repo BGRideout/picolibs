@@ -23,7 +23,8 @@ add_library(bgr_ir_protocols INTERFACE)
 
 target_sources(bgr_ir_protocols INTERFACE
     nec_receiver.cpp
-    nec_transmitter.cpp)
+    nec_transmitter.cpp
+    raw_receiver.cpp)
 
 target_link_libraries(bgr_ir_protocols INTERFACE
     bgr_ir)

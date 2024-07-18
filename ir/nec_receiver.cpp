@@ -10,42 +10,34 @@ bool NEC_Receiver::check_sync(uint64_t ts, bool falling)
     if (sync_ == 0)
     {
         n_pulse_ = 0;
-        if (!falling)
+        if (falling)
         {
-            pulses_[0] = ts;
-        }
-        else
-        {
-            uint32_t delta = ts - pulses_[0];
-            uint32_t base = base_pulse_ * 16;
-            if (delta > base - base_pulse_ && delta < base + base_pulse_)
+            uint32_t delta = ts - prev_ts_;
+            if (compare_pulse(delta, NEC_BASE_PULSE * 16, NEC_BASE_PULSE / 2))
             {
+                pulses_[n_pulse_++] = delta;
                 sync_ = 1;
-                pulses_[0] = ts;
             }
         }        
     }
     else if (sync_ == 1)
     {
-        uint32_t delta = ts - pulses_[0];
-        uint32_t base = base_pulse_ * 8;
-        if (!falling && delta > base - base_pulse_ && delta < base + base_pulse_)
+        uint32_t delta = ts - prev_ts_;
+        if (!falling && compare_pulse(delta, NEC_BASE_PULSE * 8, NEC_BASE_PULSE / 2))
         {
             sync_ = 2;
-            pulses_[0] = ts;
-            n_pulse_ = 1;
+            pulses_[n_pulse_++] = delta;
         }
         else
         {
             reset();
 
-            //  Check for repeat and callback with addr=0, func=0 if found
-            base = base_pulse_ * 4;
-            if (!falling && delta > base - base_pulse_ && delta < base + base_pulse_)
+            //  Check for repeat and callback with repeat address and function if found
+            if (!falling && compare_pulse(delta, NEC_BASE_PULSE * 4, NEC_BASE_PULSE / 2))
             {
                 if (rpt_)
                 {
-                    rpt_(ts, rpt_addr_, rpt_func_);
+                    rpt_(ts, rpt_addr_, rpt_func_, this);
                 }
             }
         }
@@ -59,16 +51,54 @@ bool NEC_Receiver::check_sync(uint64_t ts, bool falling)
 
 bool NEC_Receiver::decode_message(uint16_t &addr, uint16_t &func)
 {
+    return decode(pulses_, n_pulse_, addr, func, address_);
+}
+
+bool NEC_Receiver::decode(uint32_t const *pulses, uint32_t n_pulse, uint16_t &addr, uint16_t &func, uint16_t address)
+{
     bool ret = false;
+    addr = 0;
+    func = 0;
+    if (n_pulse < 3)
+    {
+        return false;
+    }
     uint8_t data[4];
-    int ii = 2;
+    int ii = 0;
+    uint32_t base = NEC_BASE_PULSE * 16;
+    if (compare_pulse(pulses[ii], NEC_BASE_PULSE * 16, NEC_BASE_PULSE / 2))
+    {
+        //  Skip sync mark pulse
+        ++ii;
+    }
+    if (compare_pulse(pulses[ii], NEC_BASE_PULSE * 4, NEC_BASE_PULSE / 2) &&
+        compare_pulse(pulses[ii + 1], NEC_BASE_PULSE, NEC_BASE_PULSE / 2))
+    {
+        //  Repeat code
+        return ii == 1;
+    }
+    if (compare_pulse(pulses[ii], NEC_BASE_PULSE * 8, NEC_BASE_PULSE / 2))
+    {
+        //  Skip sync space pulse
+        ++ii;
+    }
+
+    //  Point to marks
+    ++ii;
+
+    if (ii != 3 || n_pulse - ii < 64)
+    {
+        // Incorrect sync or not enough pulses
+        return false;
+    }
+
     for (int jj = 0; jj < 4; jj++)
     {
         data[jj] = 0;
         uint8_t mask = 0x01;
         for (int kk = 0; kk < 8; kk++)
         {
-            if ((pulses_[ii] - pulses_[ii - 1]) > 2 * base_pulse_)
+            if (pulses[ii] > 2 * NEC_BASE_PULSE)
             {
                 data[jj] |= mask;
             }
@@ -85,7 +115,7 @@ bool NEC_Receiver::decode_message(uint16_t &addr, uint16_t &func)
     }
     if ((data[2] ^ data[3]) == 0xff)
     {
-        if (addr == address_ || address_ == 0xffff)
+        if (addr == address || address == 0xffff)
         {
             ret = true;
         }
@@ -95,5 +125,5 @@ bool NEC_Receiver::decode_message(uint16_t &addr, uint16_t &func)
 
 bool NEC_Receiver::check_bit_timeout()
 {
-    return sync_ == 2 || bit_timeout_ > 4;
+    return sync_ == 2;
 }
