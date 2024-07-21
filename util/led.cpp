@@ -17,11 +17,15 @@ LED::~LED()
     gpio_deinit(gpio_);
 }
 
-void LED::setFlash(uint32_t period)
+bool LED::setFlash(uint32_t period)
 {
+    bool ret = true;
     flash_period_ = period;
-    flash_index_ = 0;
-    if (flash_period_ != 0 && flash_period_ > flash_bits_)
+    if (flash_index_ >= flash_bits_)
+    {
+        flash_index_ = 0;
+    }
+    if (check_flash() && flash_period_ != 0 && flash_period_ > flash_bits_)
     {
         if (flasher_ == -1)
         {
@@ -30,25 +34,41 @@ void LED::setFlash(uint32_t period)
     }
     else
     {
+        ret = false;
         if (flasher_ != -1)
         {
             cancel_alarm(flasher_);
             flasher_ = -1;
         }
     }
+    return ret;
 }
 
 bool LED::setFlashPattern(uint32_t pattern, uint32_t bits)
 {
-    bool ret = false;
-    if (pattern != 0 && bits > 1)
-    {
-        flash_index_ = 0;
-        flash_pattern_ = pattern;
-        flash_bits_ = bits;
-        ret = true;
-    }
+    flash_pattern_ = pattern;
+    flash_bits_ = bits;
+    return setFlash(flash_period_);
+}
 
+bool LED::check_flash()
+{
+    bool ret = true;
+    uint32_t mask = 0xffffffff;
+    mask >>= 32 - flash_bits_;
+    uint32_t pat = flash_pattern_ & mask;
+    if (pat == 0)
+    {
+        // All zeroes, turn off
+        gpio_put(gpio_, false);
+        ret = false;
+    }
+    else if (pat == mask)
+    {
+        // All ones, turn on
+        gpio_put(gpio_, true);
+        ret = false;
+    }
     return ret;
 }
 

@@ -8,9 +8,10 @@
 #include <hardware/timer.h>
 #include <stdio.h>
 
-IR_Receiver **IR_Receiver::receivers_ = nullptr;
-uint32_t    IR_Receiver::n_rcvr_ = 0;
-uint32_t    IR_Receiver::mx_rcvr_ = 4;
+IR_Receiver     **IR_Receiver::receivers_ = nullptr;
+uint32_t        IR_Receiver::n_rcvr_ = 0;
+uint32_t        IR_Receiver::mx_rcvr_ = 4;
+alarm_pool_t    *IR_Receiver::pool_ = nullptr;
 
 IR_Receiver::IR_Receiver(uint32_t gpio, uint32_t n_pulse)
   : gpio_(gpio), n_pulse_(0), mx_pulse_(n_pulse), prev_ts_(0), sync_(0),
@@ -22,6 +23,7 @@ IR_Receiver::IR_Receiver(uint32_t gpio, uint32_t n_pulse)
     {
         receivers_ = new IR_Receiver *[mx_rcvr_];
         n_rcvr_ = 0;
+        pool_ = alarm_pool_create_with_unused_hardware_alarm(mx_rcvr_ * 2);
     }
     if (n_rcvr_ < mx_rcvr_)
     {
@@ -51,8 +53,8 @@ IR_Receiver::IR_Receiver(uint32_t gpio, uint32_t n_pulse)
 
 IR_Receiver::~IR_Receiver()
 {
-    if (bit_timer_ != -1) cancel_alarm(bit_timer_);
-    if (msg_timer_ != -1) cancel_alarm(msg_timer_);
+    if (bit_timer_ != -1) alarm_pool_cancel_alarm(pool_, bit_timer_);
+    if (msg_timer_ != -1) alarm_pool_cancel_alarm(pool_, msg_timer_);
     gpio_set_irq_enabled(gpio_, GPIO_IRQ_EDGE_FALL|GPIO_IRQ_EDGE_RISE, false);
     gpio_deinit(gpio_);
     n_rcvr_ -= 1;
@@ -72,6 +74,8 @@ IR_Receiver::~IR_Receiver()
     {
         delete [] receivers_;
         receivers_ = nullptr;
+        alarm_pool_destroy(pool_);
+        pool_ = nullptr;
     }
     delete [] pulses_;
 }
@@ -153,12 +157,12 @@ void IR_Receiver::start_timeout()
 {
     if (msg_timeout_ > 0)
     {
-        msg_timer_ = add_alarm_in_ms(msg_timeout_, timeout_msg, this, true);
+        msg_timer_ = alarm_pool_add_alarm_in_ms(pool_, msg_timeout_, timeout_msg, this, true);
     }
     if (bit_timeout_ > 0)
     {
         prev_count_ = n_pulse_;
-        bit_timer_ = add_alarm_in_ms(bit_timeout_, timeout_bit, this, true);
+        bit_timer_ = alarm_pool_add_alarm_in_ms(pool_, bit_timeout_, timeout_bit, this, true);
     }
 }
 
@@ -229,12 +233,12 @@ void IR_Receiver::reset()
     n_pulse_ = 0;
     if (bit_timer_ != -1)
     {
-        cancel_alarm(bit_timer_);
+        alarm_pool_cancel_alarm(pool_, bit_timer_);
         bit_timer_ = -1;
     }
     if (msg_timer_ != -1)
     {
-        cancel_alarm(msg_timer_);
+        alarm_pool_cancel_alarm(pool_, msg_timer_);
         msg_timer_ = -1;
     }
     sem_release(&sem_);

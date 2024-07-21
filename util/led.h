@@ -21,6 +21,7 @@ private:
 
     static int64_t timer_cb(alarm_id_t id, void *udata);
     int64_t do_timer();
+    bool check_flash();
 
 public:
     /**
@@ -82,16 +83,18 @@ public:
      * @brief   Set LED to flashing
      * 
      * @param   period  Period of a flash pattern cycle cycle (msec) (zero turns flash off)
+     *
+     * @return  true if LED flashing, false if steady 
      */
-    void setFlash(uint32_t period);
+    bool setFlash(uint32_t period);
 
     /**
      * @brief   Set flash pattern
      * 
      * @param   pattern Bit mask of on/off states per period
-     * @param   bits    Number of bits in pattern (2-32)
+     * @param   bits    Number of bits in pattern
      * 
-     * @return  true if pattern set, false if invalid bit count or null pattern
+     * @return  true if LED flashing, false if steady
      */
     bool setFlashPattern(uint32_t pattern=1, uint32_t bits=2);
     /**

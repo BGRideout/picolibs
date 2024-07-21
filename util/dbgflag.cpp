@@ -70,7 +70,7 @@ void DBGFlag::char_avail(void *param)
                     case 'd':
                     case 'e':
                     case 'f':
-                        mask |= (c = 'a' + 10);
+                        mask |= (c - 'a' + 10);
                         break;
 
                     default:

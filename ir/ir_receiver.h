@@ -76,6 +76,7 @@ protected:
     static IR_Receiver  **receivers_;   // List of receivers
     static uint32_t     n_rcvr_;        // Number of receivers
     static uint32_t     mx_rcvr_;       // Maximum number of receivers
+    static alarm_pool_t *pool_;         // Timer pool
 
     static void gpio_cb(uint gpio, uint32_t evmask);
     static int64_t timeout_msg(alarm_id_t id, void *user_data);
