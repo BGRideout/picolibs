@@ -7,8 +7,12 @@
 
 #include "ir_receiver.h"
 
+#ifndef NEC_BASE_PULSE
 #define NEC_BASE_PULSE 562
+#endif
+#ifndef NEC_MESSAGE_LEN
 #define NEC_MESSAGE_LEN 67
+#endif
 
 class NEC_Receiver : public IR_Receiver
 {

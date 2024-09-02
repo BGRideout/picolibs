@@ -8,7 +8,8 @@ target_sources(bgr_util INTERFACE
     led.cpp
     power.cpp
     pwm.cpp
-    servo.cpp)
+    servo.cpp
+    sound.cpp)
 
 target_link_libraries(bgr_util INTERFACE
     hardware_adc

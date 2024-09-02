@@ -7,6 +7,13 @@
 
 #include "ir_led.h"
 
+#ifndef NEC_BASE_PULSE
+#define NEC_BASE_PULSE 562
+#endif
+#ifndef NEC_MESSAGE_LEN
+#define NEC_MESSAGE_LEN 67
+#endif
+
 class NEC_Transmitter : public IR_LED
 {
 private:
@@ -19,7 +26,7 @@ public:
      * 
      * @param   gpio    GPIO pin for transmit
      */
-    NEC_Transmitter(uint32_t gpio) : IR_LED(gpio, 38000, 0.25, 562, 68) {}
+    NEC_Transmitter(uint32_t gpio) : IR_LED(gpio, 38000, 0.25, NEC_MESSAGE_LEN) {}
 
     /**
      * @brief   NEC_Transmitter destructor
