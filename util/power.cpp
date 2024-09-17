@@ -7,16 +7,15 @@
 #include "power.h"
 #include <hardware/gpio.h>
 #include <hardware/adc.h>
+#if CYW43_USES_VSYS_PIN
+#include "pico/cyw43_arch.h"
+#endif
 
 #define PICO_POWER_SAMPLE_COUNT 3
 #define PICO_FIRST_ADC_PIN 26
 
 void Power::enable()
 {
-    gpio_init(PICO_VSYS_PIN);
-    adc_init();
-    adc_gpio_init(PICO_VSYS_PIN);
-
     //  Read voltage until stable
     float v0 = batteryVolts();
     for (int ii = 0; ii < 100; ii++)
@@ -36,18 +35,28 @@ void Power::enable()
 
 void Power::disable()
 {
-    gpio_deinit(PICO_VBUS_PIN);
-    gpio_deinit(PICO_VSYS_PIN);
 }
 
 bool Power::onBattery()
 {
+#if CYW43_USES_VSYS_PIN
+    return !cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+#else
+    gpio_set_function(PICO_VBUS_PIN, GPIO_FUNC_SIO);
     return !gpio_get(PICO_VBUS_PIN);
+#endif
 }
 
 float Power::batteryVolts()
 {
+#if CYW43_USES_VSYS_PIN
+    cyw43_thread_enter();
+    // Make sure cyw43 is awake
+    cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+#endif
+
     // setup adc
+    adc_gpio_init(PICO_VSYS_PIN);
     adc_select_input(PICO_VSYS_PIN - PICO_FIRST_ADC_PIN);
  
     adc_fifo_setup(true, false, 0, false, false);
@@ -67,6 +76,9 @@ float Power::batteryVolts()
 
     adc_run(false);
     adc_fifo_drain();
+#if CYW43_USES_VSYS_PIN
+    cyw43_thread_exit();
+#endif
 
     //  Discard high and low readings and average remaining
     vsys -= vhi;

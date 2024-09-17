@@ -9,7 +9,8 @@ target_sources(bgr_util INTERFACE
     power.cpp
     pwm.cpp
     servo.cpp
-    sound.cpp)
+    sound.cpp
+    txt.cpp)
 
 target_link_libraries(bgr_util INTERFACE
     hardware_adc
