@@ -97,12 +97,13 @@ public:
      * @return  true if LED flashing, false if steady
      */
     bool setFlashPattern(uint32_t pattern=1, uint32_t bits=2);
+
     /**
-     * @brief   Get the flash period in msec
+     * @brief   Set the flash period in msec
      * 
-     * @return  Flash period (zero is not flashing)
+     * @param   period	Flash period (zero is not flashing)
      */
-    uint32_t flashPeriod() const { return flash_period_; }
+    void setFlashPeriod(uint32_t period) { flash_period_ = period; }
 };
 
 #endif

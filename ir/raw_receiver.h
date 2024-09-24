@@ -1,5 +1,5 @@
 /*
-                    *****  Subclass of IR_Receiver for NEC protocol  *****
+                    *****  Subclass of IR_Receiver for raw data  *****
 */
 
 #ifndef RAW_RECEIVER

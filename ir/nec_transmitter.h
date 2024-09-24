@@ -39,7 +39,21 @@ public:
      * @param   addr    Address for IR command
      * @param   func    Function code for IR command
      */
-    void setMessageTimes(uint16_t addr, uint16_t func);
+    void setMessageTimes(uint16_t addr, uint16_t func) override;
+
+    /**
+     * @brief   Return the IR protocol
+     * 
+     * @return  Pointer to protocl name
+     */
+    virtual const char *protocol() const override { return "NEC"; }
+
+    /**
+     * @brief   Return the repeat interval in milliseconds
+     * 
+     * @return  repeat interval (msec)
+     */
+    virtual int repeatInterval() const override { return 110; }
 
 };
 

@@ -17,11 +17,15 @@ protected:
     uint32_t                out_index_;     // Output time index
     alarm_id_t              timer_;         // Timer
     float                   duty_;          // Active duty cycle
+    int                     repeat_;        // Repeat count
 
     static uint16_t         nled_;          // Number of LED's defined
     static alarm_pool_t     *pool_;         // Alarm pool
     static int64_t timer_cb(alarm_id_t id, void *user_data);
     int64_t set_next();
+
+    void                    *user_data_;    // User callback data
+    void (*done_cb_)(IR_LED *led, void *user_data);
 
 public:
     /**
@@ -52,12 +56,56 @@ public:
      * 
      * @return  true if transmission started
      */
-    bool transmit();
+    virtual bool transmit();
+
+    /**
+     * @brief   Send repeat message
+     * 
+     * @return  true if transmission started
+     */
+    virtual bool repeat() { return transmit(); }
 
     /**
      * @brief   Stop active transmission
      */
     void stop();
+
+    /**
+     * @brief   Set callback for completion of send
+     * 
+     * @param   done_cb     Pointer to function to be called on completion
+     * @param   user_data   Pointer to be passed to callback function
+     */
+    void setDoneCallback(void (*done_cb)(IR_LED *led, void *user_data), void *user_data) { done_cb_ = done_cb; user_data_ = user_data; }
+
+    /**
+     * @brief   Set times for an address / function pair
+     * 
+     * @param   addr    Address for IR command
+     * @param   func    Function code for IR command
+     */
+    virtual void setMessageTimes(uint16_t addr, uint16_t func) {}
+
+    /**
+     * @brief   Return the IR protocol
+     * 
+     * @return  Pointer to protocl name
+     */
+    virtual const char *protocol() const { return ""; }
+
+    /**
+     * @brief   Return the repeat interval in milliseconds
+     * 
+     * @return  repeat interval (msec)
+     */
+    virtual int repeatInterval() const { return 0; }
+
+    /**
+     * @brief   Return the minimum numver of repetitions of the message
+     * 
+     * @return  number of additional repetitions of the message on transmit
+     */
+    virtual int minimum_repeats() const { return 0; }
 };
 
 #endif

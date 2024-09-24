@@ -16,7 +16,7 @@ uint16_t        IR_LED::nled_ = 0;
 alarm_pool_t    *IR_LED::pool_ = nullptr;
 
 IR_LED::IR_LED(uint32_t gpio, uint32_t freq, float duty, uint32_t a_times)
- : PWM(gpio, freq), times_(nullptr), a_times_(a_times), n_times_(0), out_index_(0), timer_(-1), duty_(duty)
+ : PWM(gpio, freq), times_(nullptr), a_times_(a_times), n_times_(0), out_index_(0), timer_(-1), duty_(duty), repeat_(0), done_cb_(nullptr)
 {
     if (nled_ == 0)
     {
@@ -71,6 +71,7 @@ bool IR_LED::transmit()
     if (n_times_ > 0)
     {
         out_index_ = 0;
+        repeat_ = minimum_repeats();
         timer_ = alarm_pool_add_alarm_in_us(pool_, 10, timer_cb, this, true);
     }
     return ret;
@@ -84,6 +85,7 @@ void IR_LED::stop()
         timer_ = -1;
     }
     out_index_ = 0;
+    repeat_ = 0;
     setDutyCycle(0.0);
 }
 
@@ -103,8 +105,29 @@ int64_t IR_LED::set_next()
     }
     if (ret == 0)
     {
-        timer_ = -1;
         setDutyCycle(0.0);
+        if (repeat_ > 0)
+        {
+            repeat_ -= 1;
+            int32_t pause = repeatInterval() * 1000;
+            for (uint32_t ii = 0; ii < n_times_; ii++)
+            {
+                pause -= times_[ii];
+            }
+            if (pause < 1)
+            {
+                pause = 1;
+            }
+            ret = pause;
+        }
+        else
+        {
+            timer_ = -1;
+            if (done_cb_)
+            {
+                done_cb_(this, user_data_);
+            }
+        }
     }
     return ret;
 }
