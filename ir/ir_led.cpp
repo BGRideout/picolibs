@@ -109,6 +109,7 @@ int64_t IR_LED::set_next()
         if (repeat_ > 0)
         {
             repeat_ -= 1;
+            out_index_ = 0;
             int32_t pause = repeatInterval() * 1000;
             for (uint32_t ii = 0; ii < n_times_; ii++)
             {
