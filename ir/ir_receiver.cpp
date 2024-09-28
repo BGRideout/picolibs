@@ -155,10 +155,7 @@ void IR_Receiver::message_complete(uint64_t ts)
 
 void IR_Receiver::start_timeout()
 {
-    if (msg_timeout_ > 0)
-    {
-        msg_timer_ = alarm_pool_add_alarm_in_ms(pool_, msg_timeout_, timeout_msg, this, true);
-    }
+    start_message_timeout();
     if (bit_timeout_ > 0)
     {
         prev_count_ = n_pulse_;
@@ -166,13 +163,18 @@ void IR_Receiver::start_timeout()
     }
 }
 
+void IR_Receiver::start_message_timeout()
+{
+    if (msg_timeout_ > 0 && msg_timer_ == -1)
+    {
+        msg_timer_ = alarm_pool_add_alarm_in_ms(pool_, msg_timeout_, timeout_msg, this, true);
+    }
+}
+
 int64_t IR_Receiver::timeout_msg(alarm_id_t id, void *user_data)
 {
     IR_Receiver *self = static_cast<IR_Receiver *>(user_data);
-    if (self->sync_ != 0)
-    {
-        self->timeout(true);
-    }
+    self->timeout(true);
     self->msg_timer_ = -1;
     return 0;
 }

@@ -106,20 +106,29 @@ int64_t IR_LED::set_next()
     if (ret == 0)
     {
         setDutyCycle(0.0);
-        if (repeat_ > 0)
+        if (out_index_ == n_times_)
         {
-            repeat_ -= 1;
-            out_index_ = 0;
+            ++out_index_;
             int32_t pause = repeatInterval() * 1000;
             for (uint32_t ii = 0; ii < n_times_; ii++)
             {
                 pause -= times_[ii];
+            }
+            if (repeat_ > 0)
+            {
+                pause -= 1;
             }
             if (pause < 1)
             {
                 pause = 1;
             }
             ret = pause;
+        }
+        else if (out_index_ > n_times_ && repeat_ > 0)
+        {
+            repeat_ -= 1;
+            out_index_ = 0;
+            ret = 1;
         }
         else
         {

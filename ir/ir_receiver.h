@@ -53,7 +53,7 @@ protected:
     uint32_t            gpio_;          // GPIO number
     uint32_t            *pulses_;       // On / off times
     uint32_t            n_pulse_;       // Number of pulses
-    uint32_t            mx_pulse_;      // Maimum number of pulses
+    uint32_t            mx_pulse_;      // Maximum number of pulses
     uint64_t            prev_ts_;       // Previous timestamp
     uint8_t             sync_;          // Sync pulse flag
     ir_rcv_callback     rcb_;           // Receive callback
@@ -191,6 +191,12 @@ public:
      * @param   tmo_msec    Bit / pulse timeout in milliseconds
      */
     void set_bit_timeout(uint32_t tmo_msec) { bit_timeout_ = tmo_msec; }
+
+    /**
+     * @brief   Start message timer rather than waiting for first transition
+     * 
+     */
+    void start_message_timeout();
 
     /**
      * @brief   Wait for next message completion

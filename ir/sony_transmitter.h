@@ -10,12 +10,6 @@
 #ifndef SONY_BASE_PULSE
 #define SONY_BASE_PULSE 600
 #endif
-#ifndef SONY12_MESSAGE_LEN
-#define SONY12_MESSAGE_LEN 26
-#endif
-#ifndef SONY15_MESSAGE_LEN
-#define SONY15_MESSAGE_LEN 32
-#endif
 
 class Sony_Transmitter : public IR_LED
 {
@@ -30,7 +24,7 @@ public:
      * @param   gpio    GPIO pin for transmit
      * @param   msglen  Message length
      */
-    Sony_Transmitter(uint32_t gpio, int msglen) : IR_LED(gpio, 40000, 0.25, msglen) {}
+    Sony_Transmitter(uint32_t gpio, uint32_t msglen) : IR_LED(gpio, 40000, 0.25, msglen) {}
 
     /**
      * @brief   Sony_Transmitter destructor
@@ -84,7 +78,7 @@ public:
 class Sony12_Transmitter : public Sony_Transmitter
 {
 public:
-    Sony12_Transmitter(uint32_t gpio) : Sony_Transmitter(gpio, SONY12_MESSAGE_LEN) {}
+    Sony12_Transmitter(uint32_t gpio) : Sony_Transmitter(gpio, (5 + 7) * 2 + 1) {}
     virtual ~Sony12_Transmitter() {}
     virtual const char *protocol() const override { return "Sony12"; }
     virtual int address_size() const { return 5; };
@@ -94,7 +88,7 @@ public:
 class Sony15_Transmitter : public Sony_Transmitter
 {
 public:
-    Sony15_Transmitter(uint32_t gpio) : Sony_Transmitter(gpio, SONY15_MESSAGE_LEN) {}
+    Sony15_Transmitter(uint32_t gpio) : Sony_Transmitter(gpio, (8 + 7) * 2 + 1) {}
     virtual ~Sony15_Transmitter() {}
     virtual const char *protocol() const override { return "Sony15"; }
     virtual int address_size() const { return 8; };
