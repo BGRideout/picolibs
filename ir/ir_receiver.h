@@ -78,6 +78,8 @@ protected:
     static uint32_t     mx_rcvr_;       // Maximum number of receivers
     static alarm_pool_t *pool_;         // Timer pool
 
+    void                *user_data_;    // User data pointer
+
     static void gpio_cb(uint gpio, uint32_t evmask);
     static int64_t timeout_msg(alarm_id_t id, void *user_data);
     static int64_t timeout_bit(alarm_id_t id, void *user_data);
@@ -127,16 +129,6 @@ protected:
      * @return true if bit timeout to be processed
      */
     virtual bool check_bit_timeout() { return true; }
-
-    /**
-     * @brief   Compare pulse time
-     * 
-     * @param   pulse       Pulse time
-     * @param   nom_pulse   Nominal pulse for compare
-     * @param   band        Band either side of numinal pulse
-     */
-    static inline bool compare_pulse(uint32_t pulse, uint32_t nom_pulse, uint32_t band)
-                        {return pulse > nom_pulse - band && pulse < nom_pulse + band; }
 
 public:
     /**
@@ -203,11 +195,35 @@ public:
     /**
      * @brief   Wait for next message completion
      * 
-     * @param   timeout_ms  Maimum time to wait (milliseconds)
+     * @param   timeout_ms  Maximum time to wait (milliseconds)
      * 
      * @return  true if message complete, false if timed out waiting
      */
     bool wait_for_message(uint32_t timeout_ms=0);
+
+    /**
+     * @brief   Set user data
+     *
+     * @param   data        Pointer to user data
+     */
+    void set_user_data(void *data) { user_data_ = data; }
+
+    /**
+     * @brief   Get user data pointer
+     *
+     * @return  User data pointer
+     */
+    void *user_data() const { return user_data_; }
+
+    /**
+     * @brief   Compare pulse time
+     * 
+     * @param   pulse       Pulse time
+     * @param   nom_pulse   Nominal pulse for compare
+     * @param   band        Band either side of numinal pulse
+     */
+    static inline bool compare_pulse(uint32_t pulse, uint32_t nom_pulse, uint32_t band)
+                        {return pulse > nom_pulse - band && pulse < nom_pulse + band; }
 };
 
 #endif  

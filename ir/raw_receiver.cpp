@@ -55,4 +55,8 @@ void RAW_Receiver::store_pulses()
     {
         times_[ii] = pulses_[ii];
     }
+    if (countptr_)
+    {
+        *countptr_ = count_;
+    }
 }

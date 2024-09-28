@@ -12,6 +12,7 @@ class RAW_Receiver : public IR_Receiver
 private:
     uint32_t        *times_;            // Vector to receive times
     uint32_t        n_times_;           // Size of vector
+    uint32_t        *countptr_;         // Pointer to variable to receive count
     uint32_t        count_;             // Number of pulses stored
 
 protected:
@@ -48,9 +49,19 @@ public:
      * @param   gpio        GPIO numver for reading input
      * @param   edges       Number of edges to be received
      */
-    RAW_Receiver(uint32_t gpio, uint32_t edges) : IR_Receiver(gpio, edges), times_(nullptr), n_times_(0), count_(0) {}
+    RAW_Receiver(uint32_t gpio, uint32_t edges)
+        : IR_Receiver(gpio, edges), times_(nullptr), n_times_(0), countptr_(nullptr), count_(0) {}
     ~RAW_Receiver() {}
 
+    /**
+     * @brief   Set the buffer to receive the time data
+     *
+     * @param   times       Pointer to buffer to receive times
+     * @param   n_times     Number of elements in time array
+     * @param   count       Pointer to location to receive number of times read
+     */
+    void set_times(uint32_t *times, uint32_t n_times, uint32_t *count) { times_ = times; n_times_ = n_times; countptr_ = count; }
+    
     /**
      * @brief   Read a raw list of timestamps from the IR receiver
      * 

@@ -17,7 +17,7 @@ IR_Receiver::IR_Receiver(uint32_t gpio, uint32_t n_pulse)
   : gpio_(gpio), n_pulse_(0), mx_pulse_(n_pulse), prev_ts_(0), sync_(0),
     rcb_(nullptr), rpt_(nullptr), rpt_addr_(0), rpt_func_(0),
     tmo_(nullptr), msg_timer_(-1), bit_timer_(-1), msg_timeout_(0), bit_timeout_(0), prev_count_(0),
-    err_(nullptr)
+    err_(nullptr), user_data_(nullptr)
 {
     if (receivers_ == nullptr)
     {
