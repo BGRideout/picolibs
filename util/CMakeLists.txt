@@ -20,3 +20,15 @@ target_link_libraries(bgr_util INTERFACE
 
 target_include_directories(bgr_util INTERFACE
    ${CMAKE_CURRENT_LIST_DIR})
+
+#   JSON
+
+add_library(bgr_json INTERFACE)
+
+target_sources(bgr_json INTERFACE
+    jsonmap.cpp
+    jsonstring.cpp)
+
+target_include_directories(bgr_json INTERFACE
+   ${CMAKE_CURRENT_LIST_DIR})
+   
