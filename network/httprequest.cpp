@@ -248,6 +248,8 @@ bool HTTPRequest::get_post_urlencoded()
             else
             {
                 value.clear();
+		valptr = cp;
+		*cp = 0;
             }
             post_data_.insert(std::pair<std::string, const char *>(key, valptr));
         }
