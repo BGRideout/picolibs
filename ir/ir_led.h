@@ -63,7 +63,7 @@ public:
      * 
      * @return  true if transmission started
      */
-    virtual bool repeat() { return transmit(); }
+    virtual bool repeat();
 
     /**
      * @brief   Stop active transmission

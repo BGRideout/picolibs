@@ -34,6 +34,13 @@ public:
     virtual ~NEC_Transmitter() {}
 
     /**
+     * @brief   Send repeat message
+     * 
+     * @return  true if transmission started
+     */
+    virtual bool repeat() override;
+
+    /**
      * @brief   Set times for an address / function pair
      * 
      * @param   addr    Address for IR command

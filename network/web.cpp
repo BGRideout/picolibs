@@ -1,6 +1,5 @@
 #include "web.h"
 #include "ws.h"
-#include "txt.h"
 
 #include "stdio.h"
 
@@ -13,7 +12,6 @@
 #include "mbedtls/sha1.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/debug.h"
-#include "hardware/gpio.h"
 
 WEB *WEB::singleton_ = nullptr;
 int WEB::debug_level_ = 0;
@@ -305,7 +303,7 @@ void WEB::tcp_server_err(void *arg, err_t err)
     }
 }
 
-err_t WEB::send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate)
+err_t WEB::send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, Allocation allocate)
 {
     CLIENT *client = get()->findClient(client_pcb);
     if (client)
@@ -404,7 +402,7 @@ void WEB::process_http_rqst(CLIENT &client, bool &close)
     }
 }
 
-bool WEB::send_data(ClientHandle client, const char *data, u16_t datalen, bool allocate)
+bool WEB::send_data(ClientHandle client, const char *data, u16_t datalen, Allocation allocate)
 {
     CLIENT *clptr = findClient(client);
     CLIENT *clpcb = findClient(clptr->pcb());
@@ -447,7 +445,7 @@ void WEB::open_websocket(CLIENT &client)
 
         static char crlfcrlf[] = "\r\n\r\n";
 
-        send_buffer(client.pcb(), resp, strlen(resp), false);
+        send_buffer(client.pcb(), resp, strlen(resp), WEB::STAT);
         send_buffer(client.pcb(), b64, b64ll);
         send_buffer(client.pcb(), crlfcrlf, 4);
 
@@ -492,6 +490,7 @@ void WEB::process_websocket(CLIENT &client)
         break;
 
     case WEBSOCKET_OPCODE_CLOSE:
+        if (isDebug(1)) printf("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
         send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
         close_client(client.pcb());
         break;
@@ -751,7 +750,7 @@ bool WEB::CLIENT::rqstIsReady()
     return ret;
 }
 
-void WEB::CLIENT::queue_send(void *buffer, u16_t buflen, bool allocate)
+void WEB::CLIENT::queue_send(void *buffer, u16_t buflen, Allocation allocate)
 {
     WEB::SENDBUF *sbuf = new WEB::SENDBUF(buffer, buflen, allocate);
     sendbuf_.push_back(sbuf);
@@ -834,9 +833,9 @@ ClientHandle WEB::CLIENT::nextHandle()
     return next_handle_;
 }
 
-WEB::SENDBUF::SENDBUF(void *buf, uint32_t size, bool alloc) : buffer_((uint8_t *)buf), size_(size), sent_(0), allocated_(alloc)
+WEB::SENDBUF::SENDBUF(void *buf, uint32_t size, Allocation alloc) : buffer_((uint8_t *)buf), size_(size), sent_(0), allocated_(alloc)
 {
-    if (allocated_)
+    if (allocated_ == ALLOC)
     {
         buffer_ = new uint8_t[size];
         memcpy(buffer_, buf, size);
@@ -845,7 +844,7 @@ WEB::SENDBUF::SENDBUF(void *buf, uint32_t size, bool alloc) : buffer_((uint8_t *
 
 WEB::SENDBUF::~SENDBUF()
 {
-    if (allocated_)
+    if (allocated_ != STAT)
     {
         delete [] buffer_;
     }

@@ -77,6 +77,19 @@ bool IR_LED::transmit()
     return ret;
 }
 
+bool IR_LED::repeat()
+{
+    bool ret = true;
+    stop();
+    if (n_times_ > 0)
+    {
+        out_index_ = 0;
+        repeat_ = 0;
+        timer_ = alarm_pool_add_alarm_in_us(pool_, 10, timer_cb, this, true);
+    }
+    return ret;
+}
+
 void IR_LED::stop()
 {
     if (timer_ != -1)

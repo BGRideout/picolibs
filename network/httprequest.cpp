@@ -425,6 +425,15 @@ void HTTPRequest::replaceHeader(std::string &rqst, const std::string &newHeader)
     }
 }
 
+void HTTPRequest::replaceHeader(TXT &rqst, const char *newHeader)
+{
+    std::size_t i1 = rqst.find("\r\n\r\n");
+    if (i1 != std::string::npos)
+    {
+        rqst.replace(0, i1, newHeader);
+    }
+}
+
 void HTTPRequest::setHTMLLengthHeader(std::string &rqst)
 {
     std::size_t i1 = rqst.find("\r\n\r\n");
@@ -432,7 +441,20 @@ void HTTPRequest::setHTMLLengthHeader(std::string &rqst)
     {
         std::string newHeader("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ");
         int cl = rqst.length() - i1 - 4;
-        newHeader += std::to_string(cl) + "\r\nConnection: keep-alive\r\nCache-Control: no-store\r\n\r\n";
+        newHeader += std::to_string(cl) + "\r\nConnection: keep-alive\r\nCache-Control: no-store";
+        replaceHeader(rqst, newHeader);
+    }
+}
+
+void HTTPRequest::setHTMLLengthHeader(TXT &rqst)
+{
+    size_t i1 = rqst.find("\r\n\r\n");
+    if (i1 != std::string::npos)
+    {
+        char newHeader[128];
+        snprintf(newHeader, sizeof(newHeader),
+                "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n"
+                "Connection: keep-alive\r\nCache-Control: no-store", rqst.datasize() - i1 - 4);
         replaceHeader(rqst, newHeader);
     }
 }

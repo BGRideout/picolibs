@@ -27,6 +27,12 @@ typedef bool (*WiFiScan_cb)(WEB *, ClientHandle, const WiFiScanData &, void *);
 class WEB
 {
 public:
+    enum Allocation
+    {
+        ALLOC = 1,      // Buffer to be allocated
+        STAT,           // Buffer is static
+        PREALL          // Buffer is preallocated
+    };
 
 private:
     struct altcp_pcb    *server_;               // Server PCB
@@ -37,11 +43,11 @@ private:
         uint8_t     *buffer_;                   // Buffer pointer
         int32_t     size_;                      // Buffer length
         int32_t     sent_;                      // Bytes sent
-        bool        allocated_;                 // Buffer allocated
+        Allocation  allocated_;                 // Buffer allocation type
 
     public:
-        SENDBUF() : buffer_(nullptr), size_(0), sent_(0), allocated_(false) {}
-        SENDBUF(void *buf, uint32_t size, bool alloc = true);
+        SENDBUF() : buffer_(nullptr), size_(0), sent_(0), allocated_(ALLOC) {}
+        SENDBUF(void *buf, uint32_t size, Allocation alloc = ALLOC);
         ~SENDBUF();
 
         uint32_t to_send() const { return size_ - sent_; }
@@ -89,7 +95,7 @@ private:
         void setWebSocket() { websocket_ = true; }
         bool isWebSocket() const { return websocket_; }
 
-        void queue_send(void *buffer, u16_t buflen, bool allocate);
+        void queue_send(void *buffer, u16_t buflen, Allocation allocate);
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
         bool more_to_send() const { return sendbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
@@ -155,7 +161,7 @@ private:
     static WEB          *singleton_;                // Singleton pointer
     WEB();
 
-    err_t send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate = true);
+    err_t send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, Allocation allocate = ALLOC);
     err_t write_next(struct altcp_pcb *client_pcb);
 
     bool (*http_callback_)(WEB *web, ClientHandle client, const HTTPRequest &rqst, bool &close);
@@ -184,7 +190,7 @@ public:
     static const int AP_INACTIVE = 105;
     void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
 
-    bool send_data(ClientHandle client, const char *data, u16_t datalen, bool allocate=true);
+    bool send_data(ClientHandle client, const char *data, u16_t datalen, Allocation allocate=ALLOC);
     bool send_message(ClientHandle client, const std::string &message);
 
     void enable_ap(int minutes = 30, const std::string &name = "webapp") { ap_requested_ = minutes; ap_name_ = name; }

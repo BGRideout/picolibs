@@ -4,6 +4,16 @@
 
 #include "nec_transmitter.h"
 
+bool NEC_Transmitter::repeat()
+{
+    uint32_t times[3];
+    int ii = 0;
+    times[ii++] = NEC_BASE_PULSE * 16;
+    times[ii++] = NEC_BASE_PULSE * 4;
+    times[ii++] = NEC_BASE_PULSE;
+    setOutputTimes(times, ii);
+    return IR_LED::repeat();
+}
 
 void NEC_Transmitter::setMessageTimes(uint16_t addr, uint16_t func)
 {
