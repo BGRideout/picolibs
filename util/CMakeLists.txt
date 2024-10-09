@@ -5,7 +5,9 @@ add_library(bgr_util INTERFACE)
 target_sources(bgr_util INTERFACE
     button.cpp
     dbgflag.cpp
+    file_logger.cpp
     led.cpp
+    logger.cpp
     power.cpp
     pwm.cpp
     servo.cpp

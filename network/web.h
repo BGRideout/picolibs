@@ -17,11 +17,30 @@ extern "C"
 #include "pico/time.h"
 #include "httprequest.h"
 #include "ws.h"
+#include "logger.h"
 
 class WEB;
 
 typedef uint32_t   ClientHandle;
+
+/**
+ * @brief   Data returned by WiFI scan
+ * 
+ * @details Map of names and signal strength
+ * 
+ * @param   first       WiFI access point name (SSID)
+ * @param   second      Relative signal strength (RSSI)
+ */
 typedef std::map<std::string, int> WiFiScanData;    // SSID -> RSSI
+
+/**
+ * @brief   Callback function for WiFi SSDI scan
+ * 
+ * @param   web         Pointer to WEB object
+ * @param   client      Handle of client connection
+ * @param   ssids       Map of SSID name ro signal stength (RSSI)
+ * @param   user_data   Data pointer for user data
+ */
 typedef bool (*WiFiScan_cb)(WEB *, ClientHandle, const WiFiScanData &, void *);
 
 class WEB
@@ -157,6 +176,9 @@ private:
 
     static int debug_level_;                               // Debug level
     static bool isDebug(int level = 1) { return level <= debug_level_; }
+
+    Logger              default_logger_;            // Default logger
+    Logger              *log_;                      // Active logger
     
     static WEB          *singleton_;                // Singleton pointer
     WEB();
@@ -170,35 +192,189 @@ private:
     void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
 
 public:
+    /**
+     * @brief   Get access to the web singleton object
+     * 
+     * @return  Pointer to WEB object
+     */
     static WEB *get();
+
+    /**
+     * @brief   Initialize the web object
+     * 
+     * @return  true if successfully initialized
+     */
     bool init();
+
+    /**
+     * @brief   Initiate a connection to a WiFi access point
+     * 
+     * @param   hostname    Name of this host
+     * @param   ssid        WiFi service set identifier (access point name)
+     * @param   password    WiFi access point password
+     * 
+     * @return  true if connection initiated successfully
+     */
     bool connect_to_wifi(const std::string &hostname, const std::string &ssid, const std::string &password);
+
+    /**
+     * @brief   Change host name or WiFi connection and initiate reconnection
+     * 
+     * @param   hostname    Name of this host
+     * @param   ssid        WiFi service set identifier (access point name)
+     * @param   password    WiFi access point password
+     * 
+     * @return  true if connection initiated successfully
+     */
     bool update_wifi(const std::string &hostname, const std::string &ssid, const std::string &password);
 
+    /**
+     * @brief   Getter for hostname
+     */
     const std::string &hostname() const { return hostname_; }
+
+    /**
+     * @brief   Getter for WiFi SSID
+     */
     const std::string &wifi_ssid() const { return wifi_ssid_; }
+
+    /**
+     * @brief   Getter for current IP address on WiFi
+     */
     const std::string ip_addr() const { return ip4addr_ntoa(&wifi_addr_); }
 
+    /**
+     * @brief   Set callback for receipt of HTTP message
+     * 
+     * @param   cb          Pointer to callback function
+     * 
+     * @details Callback function takes the following parameters:
+     * 
+     *              -web    Pointer to the WEB object
+     *              -client Handle to client connection
+     *              -rqst   HTTP request object
+     *              -close  boolean initially set to true. Called function can
+     *                      set it to false to keep connection open after return
+     * 
+     *          -Callback to return true if it handled the request. If returns false,
+     *          an error response is sent to client and connection is closed.
+     */
     void set_http_callback(bool (*cb)(WEB *web, ClientHandle client, const HTTPRequest &rqst, bool &close)) { http_callback_ = cb; }
+
+    /**
+     * @brief   Set callback for receipt of websocket tet message
+     * 
+     * @param   cb          Pointer to callbck function
+     * 
+     * @details Callback function takes the following parameters:
+     * 
+     *              -web    Pointer to the WEB object
+     *              -client Handle to client connection
+     *              -msg    Payload of tet message
+     */
     void set_message_callback(void(*cb)(WEB *web, ClientHandle client, const std::string &msg)) { message_callback_ = cb; }
+
+    /**
+     * @brief   Send a tet message to all connected websockets
+     * 
+     * @param   txt         Message t be sent
+     */
     void broadcast_websocket(const std::string &txt);
 
+    /**
+     * @brief   Set callbck to receive notice of connection changes
+     * 
+     * @param   cb          Pointr to callbck function
+     * 
+     * @details Callback function takes the following parameter:
+     * 
+     *              -state  New connection state:
+     *                      +STA_INITIALIZING   Initializing WiFi connection
+     *                      +STA_CONNECTED      Connected to WiFi access point
+     *                      +STA_DISCONNECTED   Disconnected from WiFI access point
+     *                      +AP_ACTIVE          Device is acting as a WiFI access point
+     *                      +AP_INACTIVE        Device has stopped acting as access point
+     */
+    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
     static const int STA_INITIALIZING = 101;
     static const int STA_CONNECTED = 102;
     static const int STA_DISCONNECTED = 103;
     static const int AP_ACTIVE = 104;
     static const int AP_INACTIVE = 105;
-    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
 
+    /**
+     * @brief   Send HTTP message
+     * 
+     * @param   client      Handle of client connection
+     * @param   data        Pointr to data buffer
+     * @param   datalen     Number of bytes to send from data buffer
+     * @param   allocate    Type of buffer allocation to be performed:
+     *                          -ALLOC  Buffer allocated and data copied
+     *                          -STAT   data points to static data
+     *                          -PREALL Buffer waas allocated by application
+     *                                  and will be deleted by WEB object
+     * 
+     * @return  true if send queued successfully
+     */
     bool send_data(ClientHandle client, const char *data, u16_t datalen, Allocation allocate=ALLOC);
+
+    /**
+     * @brief   Send a tet message on websocket
+     * 
+     * @param   client      Handle of client connection
+     * @param   data        Pointr to data buffer
+     * @param   datalen     Number of bytes to send from data buffer
+     * 
+     * @return  true if send queued successfully
+     */
     bool send_message(ClientHandle client, const std::string &message);
 
+    /**
+     * @brief   Enable this device to act as a WiFI access point
+     * 
+     * @param   minutes     Number of minutes for access point to be active
+     * @param   name        Name (SSID) of access point
+     * 
+     * @details Access point can be used for connectins for the period specified
+     *          typically to perform configuration of the device application. The
+     *          access point will have a password of 12345678
+     */
     void enable_ap(int minutes = 30, const std::string &name = "webapp") { ap_requested_ = minutes; ap_name_ = name; }
+
+    /**
+     * @brief   Test if access point is active
+     */
     bool ap_active() const { return ap_active_ > 0; }
 
+    /**
+     * @brief   Scan for available WiFI access point names (SSID's)
+     * 
+     * @param   client      Handle of client connection (for passing to callback)
+     * @param   callback    Callback function for completion of scan
+     * @param   user_data   Data to be passed back to callbck function
+     * 
+     * @details The callback function takes the following parameters:
+     * 
+     *              -web        Pointer to the WEB object
+     *              -client     Handle to client connection passed in scan_wifi call
+     *              -ssids      map of SSID names and their signal strength
+     *              -user_data  User data pointer passed in scan_wifi call
+     */
     void scan_wifi(ClientHandle client, WiFiScan_cb callback, void *user_data = nullptr);
 
+    /**
+     * @brief   Set debug level
+     * 
+     * @param   level       Debug level (0=minimal, higher numbers for more detail)
+     */
     void setDebug(int level) { debug_level_ = level; }
+
+    /**
+     * @brief   Set logger
+     * 
+     * @param   logger      Pointer to logger class to use
+     */
+    void setLogger(Logger *logger=nullptr) { if (logger) log_ = logger; else log_ = &default_logger_; }
 };
 
 #endif

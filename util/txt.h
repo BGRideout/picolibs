@@ -29,7 +29,7 @@ public:
     TXT &operator +=(const char *append);
 
     uint32_t find(const char *str) const;
-    void insert(uint32_t offset, const char *str);
+    uint32_t insert(uint32_t offset, const char *str);
     void replace(uint32_t offset, uint32_t size, const char *replacement);
 
     bool substitute(const char *placeholder, const char *replacement);

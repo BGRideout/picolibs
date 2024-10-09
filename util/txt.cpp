@@ -67,8 +67,9 @@ TXT &TXT::operator =(const char *assign)
 TXT &TXT::operator +=(const char *append)
 {
     size_t la = strlen(append);
+    char *dst = buffer_ + endptr_;
     expand(endptr_, la);
-    strncpy(buffer_ + endptr_, append, la);
+    strncpy(dst, append, la);
     buffer_[endptr_] = 0;
     return *this;
 }
@@ -83,12 +84,13 @@ uint32_t TXT::find(const char *str) const
     return std::string::npos;
 }
 
-void TXT::insert(uint32_t offset, const char *str)
+uint32_t TXT::insert(uint32_t offset, const char *str)
 {
     size_t li = strlen(str);
     expand(offset, li);
     memcpy(buffer_ + offset, str, li);
     buffer_[endptr_] = 0;
+    return offset + li;
 }
 
 void TXT::replace(uint32_t offset, uint32_t size, const char *replacement)

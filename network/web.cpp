@@ -20,6 +20,7 @@ WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
              http_callback_(nullptr), message_callback_(nullptr), notice_callback_(nullptr)
 {
+    log_ = &default_logger_;
 }
 
 WEB *WEB::get()
@@ -37,7 +38,7 @@ bool WEB::init()
     cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
     uint32_t pm;
     cyw43_wifi_get_pm(&cyw43_state, &pm);
-    printf("Power mode: %x\n", pm);
+    log_->print("Power mode: %x\n", pm);
 
     mdns_resp_init();
 
@@ -57,7 +58,7 @@ bool WEB::init()
                                                                                  (const u8_t *)cert, certlen + 1);
     if (!conf)
     {
-        printf("TLS configuration not loaded\n");
+        log_->print("TLS configuration not loaded\n");
     }
     mbedtls_debug_set_threshold(1);
 
@@ -73,14 +74,14 @@ bool WEB::init()
     err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
     if (err)
     {
-        printf("failed to bind to port %u: %d\n", port, err);
+        log_->print("failed to bind to port %u: %d\n", port, err);
         return false;
     }
 
     server_ = altcp_listen_with_backlog(pcb, 1);
     if (!server_)
     {
-        printf("failed to listen\n");
+        log_->print("failed to listen\n");
         if (pcb)
         {
             altcp_close(pcb);
@@ -101,7 +102,7 @@ bool WEB::connect_to_wifi(const std::string &hostname, const std::string &ssid, 
     hostname_ = hostname;
     wifi_ssid_ = ssid;
     wifi_pwd_ = password;
-    printf("Host '%s' connecting to Wi-Fi on SSID '%s' ...\n", hostname_.c_str(), wifi_ssid_.c_str());
+    log_->print("Host '%s' connecting to Wi-Fi on SSID '%s' ...\n", hostname_.c_str(), wifi_ssid_.c_str());
     netif_set_hostname(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
     bool ret = cyw43_arch_wifi_connect_async(wifi_ssid_.c_str(), wifi_pwd_.c_str(), CYW43_AUTH_WPA2_AES_PSK) == 0;
     return ret;
@@ -119,7 +120,7 @@ WEB::CLIENT *WEB::addClient(struct altcp_pcb *pcb)
     }
     else
     {
-        printf("A client entry for pcb %p already eists. Points to handle %d\n", pcb, it->second);
+        log_->print("A client entry for pcb %p already eists. Points to handle %d\n", pcb, it->second);
     }
     return nullptr;
 }
@@ -175,18 +176,18 @@ err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
 {
     WEB *web = get();
     if (err != ERR_OK || client_pcb == NULL) {
-        printf("Failure in accept %d\n", err);
+        WEB::get()->log_->print("Failure in accept %d\n", err);
         return ERR_VAL;
     }
     CLIENT *client = web->addClient(client_pcb);
-    if (isDebug(1)) printf("Client connected %p (handle %d) (%d clients)\n", client_pcb, client->handle(), web->clientPCB_.size());
+    if (isDebug(1)) WEB::get()->log_->print("Client connected %p (handle %d) (%d clients)\n", client_pcb, client->handle(), web->clientPCB_.size());
     if (isDebug(3))
     {
         for (auto it = web->clientHndl_.cbegin(); it != web->clientHndl_.cend(); ++it)
         {
-            printf("  %c-%p (%d)", it->second->isWebSocket() ? 'w' : 'h', it->first, it->second->handle());
+            WEB::get()->log_->print("  %c-%p (%d)", it->second->isWebSocket() ? 'w' : 'h', it->first, it->second->handle());
         }
-        if (web->clientHndl_.size() > 0) printf("\n");
+        if (web->clientHndl_.size() > 0) WEB::get()->log_->print("\n");
     }
 
     altcp_arg(client_pcb, client_pcb);
@@ -254,7 +255,7 @@ err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, er
     }
     else
     {
-        printf("Zero length receive from %p\n", tpcb);
+        WEB::get()->log_->print("Zero length receive from %p\n", tpcb);
     }
     pbuf_free(p);
 
@@ -279,13 +280,13 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
         {
             if (client->more_to_send())
             {
-                if (isDebug(1)) printf("Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
+                if (isDebug(1)) WEB::get()->log_->print("Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
                 web->write_next(client->pcb());
             }
         }
         else
         {
-            printf("Poll on closed pcb %p (client %d)\n", tpcb, client->handle());
+            WEB::get()->log_->print("Poll on closed pcb %p (client %d)\n", tpcb, client->handle());
         }
     }
     return ERR_OK;
@@ -295,7 +296,7 @@ void WEB::tcp_server_err(void *arg, err_t err)
 {
     WEB *web = get();
     altcp_pcb *client_pcb = (altcp_pcb *)arg;
-    printf("Error %d on client %p\n", err, client_pcb);
+    if (isDebug(1)) WEB::get()->log_->print("Error %d on client %p\n", err, client_pcb);
     CLIENT *client = web->findClient(client_pcb);
     if (client)
     {
@@ -336,7 +337,7 @@ err_t WEB::write_next(altcp_pcb *client_pcb)
             cyw43_arch_lwip_end();
             if (err != ERR_OK)
             {
-                printf("Failed to write %d bytes of data %d to %p (%d)\n", buflen, err, client_pcb, client->handle());
+                log_->print("Failed to write %d bytes of data %d to %p (%d)\n", buflen, err, client_pcb, client->handle());
                 client->requeue(buffer, buflen);
             }
         }
@@ -348,7 +349,7 @@ err_t WEB::write_next(altcp_pcb *client_pcb)
     }
     else
     {
-        printf("Unknown client %p for write\n", client_pcb);
+        log_->print("Unknown client %p for write\n", client_pcb);
     }
     return err;    
 }
@@ -357,7 +358,7 @@ void WEB::process_rqst(CLIENT &client)
 {
     bool ok = false;
     bool close = true;
-    if (isDebug(2)) printf("Request from %p (%d):\n%s\n", client.pcb(), client.handle(), client.rqst().c_str());
+    if (isDebug(2)) log_->print("Request from %p (%d):\n%s\n", client.pcb(), client.handle(), client.rqst().c_str());
     if (!client.isWebSocket())
     {
         ok = true;
@@ -412,14 +413,14 @@ bool WEB::send_data(ClientHandle client, const char *data, u16_t datalen, Alloca
     }
     else
     {
-        printf("send_data to non-existent client handle %d (pcb: %p)\n", client, clpcb);
+        log_->print("send_data to non-existent client handle %d (pcb: %p)\n", client, clpcb);
     }
     return clptr != nullptr;
 }
 
 void WEB::open_websocket(CLIENT &client)
 {
-    if (isDebug(1)) printf("Accepting websocket connection on %p (handle %d)\n", client.pcb(), client.handle());
+    if (isDebug(1)) log_->print("Accepting websocket connection on %p (handle %d)\n", client.pcb(), client.handle());
     std::string host = client.http().header("Host");
     std::string key = client.http().header("Sec-WebSocket-Key");
     
@@ -454,7 +455,7 @@ void WEB::open_websocket(CLIENT &client)
     }
     else
     {
-        printf("Bad websocket request from %p\n", client.pcb());
+        log_->print("Bad websocket request from %p\n", client.pcb());
     }
 }
 
@@ -490,13 +491,13 @@ void WEB::process_websocket(CLIENT &client)
         break;
 
     case WEBSOCKET_OPCODE_CLOSE:
-        if (isDebug(1)) printf("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
+        if (isDebug(1)) log_->print("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
         send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
         close_client(client.pcb());
         break;
 
     default:
-        printf("Unhandled websocket opcode %d from %p\n", opc, client.pcb());
+        log_->print("Unhandled websocket opcode %d from %p\n", opc, client.pcb());
     }
 }
 
@@ -506,12 +507,12 @@ bool WEB::send_message(ClientHandle client, const std::string &message)
     CLIENT *clpcb = findClient(clptr->pcb());
     if (clptr && clpcb == clptr)
     {
-        if (isDebug(2)) printf("%p (%d) message: %s\n", clptr->pcb(), clptr->handle(), message.c_str());
+        if (isDebug(2)) log_->print("%p (%d) message: %s\n", clptr->pcb(), clptr->handle(), message.c_str());
         send_websocket(clptr->pcb(), WEBSOCKET_OPCODE_TEXT, message);
     }
     else
     {
-        printf("send_message to non-existent client handle %d (pcb: %p)\n", client, clpcb);
+        log_->print("send_message to non-existent client handle %d (pcb: %p)\n", client, clpcb);
     }
     return clptr != nullptr;
 }
@@ -545,26 +546,26 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
             if (!client->more_to_send())
             {
                 altcp_close(client_pcb);
-                if (isDebug(1)) printf("Closed %s %p (%d). client count = %d\n",
+                if (isDebug(1)) log_->print("Closed %s %p (%d). client count = %d\n",
                                     (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), clientPCB_.size() - 1);
                 deleteClient(client_pcb);
                 if (isDebug(3))
                 {
                     for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
                     {
-                        printf(" %c-%p (%d)", client->isWebSocket() ? 'w' : 'h', client->pcb(), client->handle());
+                        log_->print(" %c-%p (%d)", client->isWebSocket() ? 'w' : 'h', client->pcb(), client->handle());
                     }
-                    if (clientHndl_.size() > 0) printf("\n");
+                    if (clientHndl_.size() > 0) log_->print("\n");
                 }
             }
             else
             {
-                if (isDebug(1)) printf("Waiting to close %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
+                if (isDebug(1)) log_->print("Waiting to close %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             }
         }
         else
         {
-            printf("Closing %s %p (%d)for error\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
+            if (isDebug(1)) log_->print("Closing %s %p (%d)for error\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             client->setClosed();
             deleteClient(client_pcb);
         }
@@ -604,7 +605,7 @@ void WEB::check_wifi()
             mdns_resp_add_netif(ni, hostname_.c_str());
             mdns_resp_announce(ni);
             mdns_active_ = true;
-            printf("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
+            log_->print("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
             send_notice(STA_CONNECTED);
             break;
 
@@ -612,7 +613,7 @@ void WEB::check_wifi()
         case CYW43_LINK_FAIL:
         case CYW43_LINK_NONET:
             //  Not connected
-            printf("WiFi disconnected. status = %s\n", (wifi_state_ == CYW43_LINK_DOWN) ? "link down" :
+            log_->print("WiFi disconnected. status = %s\n", (wifi_state_ == CYW43_LINK_DOWN) ? "link down" :
                                                        (wifi_state_ == CYW43_LINK_FAIL) ? "link failed" :
                                                        "No network found");
             send_notice(STA_DISCONNECTED);
@@ -620,7 +621,7 @@ void WEB::check_wifi()
 
         case CYW43_LINK_BADAUTH:
             //  Need intervention to connect
-            printf("WiFi authentication failed\n");
+            log_->print("WiFi authentication failed\n");
             send_notice(STA_DISCONNECTED);
             break;
         }
@@ -691,7 +692,7 @@ void WEB::start_ap()
 {
     if (ap_active_ == 0)
     {
-        printf("Starting AP %s\n", ap_name_.c_str());
+        log_->print("Starting AP %s\n", ap_name_.c_str());
         cyw43_arch_enable_ap_mode(ap_name_.c_str(), "12345678", CYW43_AUTH_WPA2_AES_PSK);
         netif_set_hostname(wifi_netif(CYW43_ITF_AP), ap_name_.c_str());
     
@@ -704,7 +705,7 @@ void WEB::start_ap()
     }
     else
     {
-        printf("AP is already active. Timer reset.\n");
+        log_->print("AP is already active. Timer reset.\n");
     }
     ap_active_ = ap_requested_ * 60 * 2;
     ap_requested_ = 0;
@@ -715,7 +716,7 @@ void WEB::stop_ap()
 {
     dhcp_server_deinit(&dhcp_);
     cyw43_arch_disable_ap_mode();
-    printf("AP deactivated\n");
+    log_->print("AP deactivated\n");
     send_notice(AP_INACTIVE);
 }
 
@@ -878,15 +879,15 @@ void WEB::SENDBUF::requeue(void *buffer, u16_t buflen)
         if (memcmp(&buffer_[nn], buffer, buflen) == 0)
         {
             sent_ = nn;
-            printf("%d bytes requeued\n", buflen);
+            WEB::get()->log_->print("%d bytes requeued\n", buflen);
         }
         else
         {
-            printf("Buffer mismatch! %d bytes not requeued\n", buflen);
+            WEB::get()->log_->print("Buffer mismatch! %d bytes not requeued\n", buflen);
         }
     }
     else
     {
-        printf("%d bytes to requeue exceeds %d sent\n", buflen, sent_);
+        WEB::get()->log_->print("%d bytes to requeue exceeds %d sent\n", buflen, sent_);
     }
 }
