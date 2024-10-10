@@ -15,7 +15,7 @@ TXT::TXT(const char *data, uint32_t datalen, uint32_t size)
     buffer_[endptr_] = 0;
 }
 
-void TXT::expand(uint32_t offset, uint32_t amount)
+char *TXT::expand(uint32_t offset, uint32_t amount)
 {
     if (endptr_ + amount >= bufsiz_)
     {
@@ -39,9 +39,10 @@ void TXT::expand(uint32_t offset, uint32_t amount)
     }
     endptr_ += amount;
     buffer_[endptr_] = 0;
+    return buffer_ + offset;
 }
 
-void TXT::contract(uint32_t offset, uint32_t amount)
+char *TXT::contract(uint32_t offset, uint32_t amount)
 {
     char *src = buffer_ + offset + amount; 
     char *dst = buffer_ + offset;
@@ -52,6 +53,7 @@ void TXT::contract(uint32_t offset, uint32_t amount)
     }
     endptr_ -= amount;
     buffer_[endptr_] = 0;
+    return buffer_ + offset;
 }
 
 TXT &TXT::operator =(const char *assign)
@@ -67,8 +69,7 @@ TXT &TXT::operator =(const char *assign)
 TXT &TXT::operator +=(const char *append)
 {
     size_t la = strlen(append);
-    char *dst = buffer_ + endptr_;
-    expand(endptr_, la);
+    char *dst = expand(endptr_, la);
     strncpy(dst, append, la);
     buffer_[endptr_] = 0;
     return *this;

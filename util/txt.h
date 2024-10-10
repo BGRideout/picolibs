@@ -12,8 +12,8 @@ private:
     uint32_t        bufsiz_;                // Buffer size
     uint32_t        endptr_;                // End of data offset
 
-    void expand(uint32_t offset, uint32_t amount);
-    void contract(uint32_t offset, uint32_t amount);
+    char *expand(uint32_t offset, uint32_t amount);
+    char *contract(uint32_t offset, uint32_t amount);
     
 public:
     TXT() : buffer_(nullptr), bufsiz_(0), endptr_(0) {}
