@@ -6,6 +6,7 @@
 #include "logger.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 class FileLogger : public Logger
 {
@@ -14,6 +15,7 @@ private:
     uint32_t    max_lines_;             // Maximum number of lines in file
     uint32_t    trimmed_lines_;         // Number of lines after trimming
     uint32_t    line_count_;            // Lines in file
+    time_t      last_timestamp_;        // Last timestamp printed
 
     void count_lines();
 
@@ -111,6 +113,11 @@ public:
      * @param   file    File handle returned by open
      */
     void close(FILE *file) { if (file) fclose(file); }
+
+    /**
+     * @brief   Call to initialize timestamps
+     */
+    void initialize_timestamps();
 };
 
 #endif

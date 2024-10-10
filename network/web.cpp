@@ -7,6 +7,7 @@
 #include "lwip/altcp_tcp.h"
 #include "lwip/altcp_tls.h"
 #include "lwip/apps/mdns.h"
+#include "lwip/apps/sntp.h"
 #include "lwip/netif.h"
 #include "lwip/prot/iana.h"
 #include "mbedtls/sha1.h"
@@ -41,6 +42,10 @@ bool WEB::init()
     log_->print("Power mode: %x\n", pm);
 
     mdns_resp_init();
+
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");
+    sntp_init();
 
 #ifdef USE_HTTPS
     u16_t port = LWIP_IANA_PORT_HTTPS;
@@ -719,9 +724,6 @@ void WEB::stop_ap()
     log_->print("AP deactivated\n");
     send_notice(AP_INACTIVE);
 }
-
-
-
 
 WEB::CLIENT::~CLIENT()
 {

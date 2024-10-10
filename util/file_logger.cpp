@@ -9,7 +9,7 @@
 #include <list>
 
 FileLogger::FileLogger(const char *filename, uint32_t max_lines, uint32_t trimmed_lines)
- : Logger(), max_lines_(max_lines), trimmed_lines_(trimmed_lines)
+ : Logger(), max_lines_(max_lines), trimmed_lines_(trimmed_lines), last_timestamp_(0)
 {
     filename_ = new char[strlen(filename) +  1];
     strcpy(filename_, filename);
@@ -28,11 +28,24 @@ int FileLogger::print(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
+
+    time_t now;
+    time(&now);
+    if (last_timestamp_ != 0 && now - last_timestamp_ > 15 * 60)
+    {
+        printf("%s", ctime(&now));
+    }
     int ret = vprintf(format, ap);
 
     FILE *f = fopen(filename_, "a+");
     if (f)
     {
+        if (last_timestamp_ != 0 && now - last_timestamp_ > 15 * 60)
+        {
+            fprintf(f, "%s", ctime(&now));
+            ++line_count_;
+            last_timestamp_ = now;
+        }
         ret = vfprintf(f, format, ap);
         if (ret > 0)
         {
@@ -161,4 +174,10 @@ void FileLogger::count_lines()
         }
         fclose(f);
     }
+}
+
+void FileLogger::initialize_timestamps()
+{
+    time(&last_timestamp_);
+    print("Time initialized at UTC %s", ctime(&last_timestamp_));
 }
