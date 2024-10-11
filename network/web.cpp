@@ -17,6 +17,10 @@
 WEB *WEB::singleton_ = nullptr;
 int WEB::debug_level_ = 0;
 
+#define HTTP_IDLE_TIME  10      // Maximum idle time of HTTP connction (minutes)
+#define WS_IDLE_TIME    30      // Maximum idle time of websocket connction (minutes)
+#define WS_CLOSE_WAIT    2      // Time to wait for response to websocket close (minutes)
+
 WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
              http_callback_(nullptr), message_callback_(nullptr), notice_callback_(nullptr)
@@ -288,10 +292,37 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
                 if (isDebug(1)) WEB::get()->log_->print("Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
                 web->write_next(client->pcb());
             }
+
+            //  Check for idle connections
+            if (client->isIdle())
+            {
+                if (client->isWebSocket())
+                {
+                    if (!client->wasWSCloseSent())
+                    {
+                        WEB::get()->log_->print("Closing websocket %p (%d) for idle (%d clients)\n",
+                                                tpcb, client->handle(), web->clientPCB_.size());
+                        web->send_websocket(client->pcb(), WEBSOCKET_OPCODE_CLOSE, std::string());
+                        client->setWSCloseSent();
+                    }
+                    else
+                    {
+                        WEB::get()->log_->print("Closing websocket %p (%d) after no response to close (%d clients)\n",
+                                                tpcb, client->handle(), web->clientPCB_.size());
+                        web->close_client(tpcb);
+                    }
+                }
+                else
+                {
+                    WEB::get()->log_->print("Closing http %p (%d) for idle (%d clients)\n",
+                                            tpcb, client->handle(), web->clientPCB_.size());
+                    web->close_client(tpcb);
+                }
+            }
         }
         else
         {
-            WEB::get()->log_->print("Poll on closed pcb %p (client %d)\n", tpcb, client->handle());
+            web->log_->print("Poll on closed pcb %p (client %d)\n", tpcb, client->handle());
         }
     }
     return ERR_OK;
@@ -326,6 +357,7 @@ err_t WEB::write_next(altcp_pcb *client_pcb)
     CLIENT *client = get()->findClient(client_pcb);
     if (client)
     {
+        client->activity();
         u16_t nn = altcp_sndbuf(client_pcb);
         if (nn > TCP_MSS)
         {
@@ -363,6 +395,7 @@ void WEB::process_rqst(CLIENT &client)
 {
     bool ok = false;
     bool close = true;
+    client.activity();
     if (isDebug(2)) log_->print("Request from %p (%d):\n%s\n", client.pcb(), client.handle(), client.rqst().c_str());
     if (!client.isWebSocket())
     {
@@ -466,25 +499,13 @@ void WEB::open_websocket(CLIENT &client)
 
 void WEB::process_websocket(CLIENT &client)
 {
+    client.activity();
     std::string func;
     uint8_t opc = client.wshdr().meta.bits.OPCODE;
     std::string payload = client.rqst().substr(client.wshdr().start, client.wshdr().length);
     switch (opc)
     {
     case WEBSOCKET_OPCODE_TEXT:
-        if (payload.substr(0, 5) == "func=")
-        {
-            std::size_t ii = payload.find_first_of(" ");
-            if (ii == std::string::npos)
-            {
-                func = func = payload.substr(5);
-            }
-            else
-            {
-                func = payload.substr(5, ii - 5);
-            }
-        }
-
         if (message_callback_)
         {
             message_callback_(this, client.handle(), payload);
@@ -497,7 +518,10 @@ void WEB::process_websocket(CLIENT &client)
 
     case WEBSOCKET_OPCODE_CLOSE:
         if (isDebug(1)) log_->print("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
-        send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
+        if (!client.wasWSCloseSent())
+        {
+            send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
+        }
         close_client(client.pcb());
         break;
 
@@ -818,6 +842,12 @@ void WEB::CLIENT::resetRqst()
             rqst_.clear();
         }
     }
+}
+
+bool WEB::CLIENT::isIdle() const
+{
+    int64_t idle = absolute_time_diff_us(last_activity_, get_absolute_time()) / 60000000LL;
+    return !isClosed() && websocket_ ? idle > (wasWSCloseSent() ? WS_CLOSE_WAIT : WS_IDLE_TIME) : idle > HTTP_IDLE_TIME;
 }
 
 ClientHandle WEB::CLIENT::next_handle_ = 999;

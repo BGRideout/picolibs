@@ -81,10 +81,13 @@ private:
         struct altcp_pcb        *pcb_;              // Client pcb
         bool                    closed_;            // Closed flag
         bool                    websocket_;         // Web socket open flag
+        bool                    ws_close_sent_;     // Web socket close sent
 
         std::list<SENDBUF *>    sendbuf_;           // Send buffers
         HTTPRequest             http_;              // HTTP request info
         WebsocketPacketHeader_t wshdr_;             // Websocket message header
+
+        absolute_time_t         last_activity_;     // Time of last activity
 
         ClientHandle            handle_;            // Client handle
         static ClientHandle     next_handle_;       // Next handle
@@ -93,7 +96,9 @@ private:
         CLIENT() : pcb_(nullptr), closed_(true), websocket_(false), handle_(0) {}
 
     public:
-        CLIENT(struct altcp_pcb *client_pcb) : pcb_(client_pcb), closed_(false), websocket_(false) { handle_ = nextHandle(); }
+        CLIENT(struct altcp_pcb *client_pcb)
+         : pcb_(client_pcb), closed_(false), websocket_(false), ws_close_sent_(false)
+          { activity(); handle_ = nextHandle(); }
         ~CLIENT();
 
         void addToRqst(const char *str, u16_t ll);
@@ -114,10 +119,16 @@ private:
         void setWebSocket() { websocket_ = true; }
         bool isWebSocket() const { return websocket_; }
 
+        bool wasWSCloseSent() const { return ws_close_sent_; }
+        void setWSCloseSent() { activity(); ws_close_sent_ = true; }
+; 
         void queue_send(void *buffer, u16_t buflen, Allocation allocate);
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
         bool more_to_send() const { return sendbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
+
+        bool isIdle() const;
+        void activity() { if (!ws_close_sent_) last_activity_ = get_absolute_time(); }
 
         const ClientHandle &handle() const { return handle_; }
     };
