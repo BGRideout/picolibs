@@ -126,6 +126,7 @@ private:
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
         bool more_to_send() const { return sendbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
+        void purge_sendbuf();
 
         bool isIdle() const;
         void activity() { if (!ws_close_sent_) last_activity_ = get_absolute_time(); }

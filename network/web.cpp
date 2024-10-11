@@ -211,9 +211,19 @@ err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
 err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     WEB *web = get();
+    CLIENT *client = web->findClient(tpcb);
     if (!p)
     {
+        if (client)
+        {
+            client->purge_sendbuf();
+        }
         web->close_client(tpcb);
+        client = web->findClient(tpcb);
+        if (client)
+        {
+            web->close_client(tpcb, true);
+        }
         return ERR_OK;
     }
 
@@ -225,7 +235,6 @@ err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, er
     {
         // Receive the buffer
         bool ready = false;
-        CLIENT *client = web->findClient(tpcb);
         if (client)
         {
             char buf[64];
@@ -520,6 +529,7 @@ void WEB::process_websocket(CLIENT &client)
         if (isDebug(1)) log_->print("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
         if (!client.wasWSCloseSent())
         {
+            client.setWSCloseSent();
             send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
         }
         close_client(client.pcb());
@@ -805,6 +815,22 @@ bool WEB::CLIENT::get_next(u16_t count, void **buffer, u16_t *buflen)
     }
 
     return ret;
+}
+
+void WEB::CLIENT::purge_sendbuf()
+{
+    while (sendbuf_.size() > 0)
+    {
+        if (sendbuf_.front()->to_send() > 0)
+        {
+            break;
+        }
+        else
+        {
+            delete sendbuf_.front();
+            sendbuf_.pop_front();
+        }
+    }
 }
 
 void WEB::CLIENT::requeue(void *buffer, u16_t buflen)
