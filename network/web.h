@@ -62,16 +62,20 @@ private:
         uint8_t     *buffer_;                   // Buffer pointer
         int32_t     size_;                      // Buffer length
         int32_t     sent_;                      // Bytes sent
+        int32_t     ack_;                       // Bytes acknowledged
         Allocation  allocated_;                 // Buffer allocation type
 
     public:
-        SENDBUF() : buffer_(nullptr), size_(0), sent_(0), allocated_(ALLOC) {}
+        SENDBUF() : buffer_(nullptr), size_(0), sent_(0), ack_(0), allocated_(ALLOC) {}
         SENDBUF(void *buf, uint32_t size, Allocation alloc = ALLOC);
         ~SENDBUF();
 
         uint32_t to_send() const { return size_ - sent_; }
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
         void requeue(void *buffer, u16_t buflen);
+
+        int32_t acknowledge(int count);
+        bool isAcknowledged() const { return ack_ == size_; }
     };
 
     class CLIENT
@@ -84,6 +88,7 @@ private:
         bool                    ws_close_sent_;     // Web socket close sent
 
         std::list<SENDBUF *>    sendbuf_;           // Send buffers
+        std::list<SENDBUF *>    sentbuf_;           // Buffers waiting ack of send
         HTTPRequest             http_;              // HTTP request info
         WebsocketPacketHeader_t wshdr_;             // Websocket message header
 
@@ -124,9 +129,9 @@ private:
 ; 
         void queue_send(void *buffer, u16_t buflen, Allocation allocate);
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
-        bool more_to_send() const { return sendbuf_.size() > 0; }
+        bool more_to_send(bool quick=true) const { return sendbuf_.size() > 0 || sentbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
-        void purge_sendbuf();
+        void acknowledge(int count);
 
         bool isIdle() const;
         void activity() { if (!ws_close_sent_) last_activity_ = get_absolute_time(); }
@@ -152,6 +157,7 @@ private:
     void process_websocket(CLIENT &client);
     void send_websocket(struct altcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
 
+    void mark_for_close(struct altcp_pcb *client_pcb);
     void close_client(struct altcp_pcb *client_pcb, bool isClosed = false);
 
     std::string     hostname_;              // Host name

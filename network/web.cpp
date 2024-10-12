@@ -214,16 +214,8 @@ err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, er
     CLIENT *client = web->findClient(tpcb);
     if (!p)
     {
-        if (client)
-        {
-            client->purge_sendbuf();
-        }
-        web->close_client(tpcb);
-        client = web->findClient(tpcb);
-        if (client)
-        {
-            web->close_client(tpcb, true);
-        }
+        if (isDebug(1)) web->log_->print("Client %p (%d) closed by peer\n", tpcb, client ? client->handle() : 0);
+        web->close_client(tpcb, true);
         return ERR_OK;
     }
 
@@ -283,6 +275,11 @@ err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, er
 err_t WEB::tcp_server_sent(void *arg, struct altcp_pcb *tpcb, u16_t len)
 {
     WEB *web = get();
+    CLIENT *client = web->findClient(tpcb);
+    if (client)
+    {
+        client->acknowledge(len);
+    }
     web->write_next(tpcb);
     return ERR_OK;
 }
@@ -311,22 +308,28 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
                     {
                         WEB::get()->log_->print("Closing websocket %p (%d) for idle (%d clients)\n",
                                                 tpcb, client->handle(), web->clientPCB_.size());
-                        web->send_websocket(client->pcb(), WEBSOCKET_OPCODE_CLOSE, std::string());
                         client->setWSCloseSent();
+                        web->send_websocket(client->pcb(), WEBSOCKET_OPCODE_CLOSE, std::string());
                     }
                     else
                     {
                         WEB::get()->log_->print("Closing websocket %p (%d) after no response to close (%d clients)\n",
                                                 tpcb, client->handle(), web->clientPCB_.size());
-                        web->close_client(tpcb);
+                        web->mark_for_close(tpcb);
                     }
                 }
                 else
                 {
                     WEB::get()->log_->print("Closing http %p (%d) for idle (%d clients)\n",
                                             tpcb, client->handle(), web->clientPCB_.size());
-                    web->close_client(tpcb);
+                    web->mark_for_close(tpcb);
                 }
+            }
+
+            //  If marked for close, try close now
+            if (client->isClosed())
+            {
+                web->close_client(tpcb);
             }
         }
         else
@@ -341,8 +344,8 @@ void WEB::tcp_server_err(void *arg, err_t err)
 {
     WEB *web = get();
     altcp_pcb *client_pcb = (altcp_pcb *)arg;
-    if (isDebug(1)) WEB::get()->log_->print("Error %d on client %p\n", err, client_pcb);
     CLIENT *client = web->findClient(client_pcb);
+    if (isDebug(1)) WEB::get()->log_->print("Error %d on client %p (%d)\n", err, client_pcb, client ? client->handle() : 0);
     if (client)
     {
         web->close_client(client_pcb, true);
@@ -532,7 +535,7 @@ void WEB::process_websocket(CLIENT &client)
             client.setWSCloseSent();
             send_websocket(client.pcb(), WEBSOCKET_OPCODE_CLOSE, payload);
         }
-        close_client(client.pcb());
+        mark_for_close(client.pcb());
         break;
 
     default:
@@ -574,6 +577,15 @@ void WEB::broadcast_websocket(const std::string &txt)
     }
 }
 
+void WEB::mark_for_close(struct altcp_pcb *client_pcb)
+{
+    CLIENT *client = findClient(client_pcb);
+    if (client)
+    {
+        client->setClosed();
+    }
+}
+
 void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
 {
     CLIENT *client = findClient(client_pcb);
@@ -582,19 +594,28 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
         if (!isClosed)
         {
             client->setClosed();
+            client->acknowledge(0);
             if (!client->more_to_send())
             {
-                altcp_close(client_pcb);
-                if (isDebug(1)) log_->print("Closed %s %p (%d). client count = %d\n",
-                                    (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), clientPCB_.size() - 1);
-                deleteClient(client_pcb);
-                if (isDebug(3))
+                err_t csts = altcp_close(client_pcb);
+                if (csts == ERR_OK)
                 {
-                    for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
+                    if (isDebug(1)) log_->print("Closed %s %p (%d). client count = %d\n",
+                                    (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), clientPCB_.size() - 1);
+                    deleteClient(client_pcb);
+                    if (isDebug(3))
                     {
-                        log_->print(" %c-%p (%d)", client->isWebSocket() ? 'w' : 'h', client->pcb(), client->handle());
+                        for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
+                        {
+                            log_->print(" %c-%p (%d)", client->isWebSocket() ? 'w' : 'h', client->pcb(), client->handle());
+                        }
+                        if (clientHndl_.size() > 0) log_->print("\n");
                     }
-                    if (clientHndl_.size() > 0) log_->print("\n");
+                }
+                else
+                {
+                    if (isDebug(1)) log_->print("Deferred close of %s %s %p (%d). status = %d\n",
+                                    (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), csts);
                 }
             }
             else
@@ -604,7 +625,7 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
         }
         else
         {
-            if (isDebug(1)) log_->print("Closing %s %p (%d)for error\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
+            if (isDebug(1)) log_->print("Closing %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             client->setClosed();
             deleteClient(client_pcb);
         }
@@ -613,7 +634,8 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
     {
         if (!isClosed)
         {
-            altcp_close(client_pcb);
+            err_t csts = altcp_close(client_pcb);
+            if (isDebug(1)) log_->print("Close status %p  = %d\n", client_pcb, csts);
         }   
     }
 }
@@ -766,6 +788,11 @@ WEB::CLIENT::~CLIENT()
         delete sendbuf_.front();
         sendbuf_.pop_front();
     }
+    while (sentbuf_.size() > 0)
+    {
+        delete sentbuf_.front();
+        sentbuf_.pop_front();
+    }
 }
 
 void WEB::CLIENT::addToRqst(const char *str, u16_t ll)
@@ -808,8 +835,9 @@ bool WEB::CLIENT::get_next(u16_t count, void **buffer, u16_t *buflen)
             }
             else
             {
-                delete sendbuf_.front();
+                sentbuf_.push_back(sendbuf_.front());
                 sendbuf_.pop_front();
+                acknowledge(0);
             }
         }
     }
@@ -817,27 +845,44 @@ bool WEB::CLIENT::get_next(u16_t count, void **buffer, u16_t *buflen)
     return ret;
 }
 
-void WEB::CLIENT::purge_sendbuf()
-{
-    while (sendbuf_.size() > 0)
-    {
-        if (sendbuf_.front()->to_send() > 0)
-        {
-            break;
-        }
-        else
-        {
-            delete sendbuf_.front();
-            sendbuf_.pop_front();
-        }
-    }
-}
-
 void WEB::CLIENT::requeue(void *buffer, u16_t buflen)
 {
     if (sendbuf_.size() > 0)
     {
         sendbuf_.front()->requeue(buffer, buflen);
+    }
+}
+
+void WEB::CLIENT::acknowledge(int count)
+{
+    for (auto it = sentbuf_.begin(); count > 0 && it != sentbuf_.end(); )
+    {
+        SENDBUF *sb = sentbuf_.front();
+        count = sb->acknowledge(count);
+        if (sb->isAcknowledged())
+        {
+            it = sentbuf_.erase(it);
+            delete sb;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    for (auto it = sendbuf_.begin(); count > 0 && it != sendbuf_.end(); )
+    {
+        SENDBUF *sb = sendbuf_.front();
+        count = sb->acknowledge(count);
+        if (sb->isAcknowledged())
+        {
+            it = sendbuf_.erase(it);
+            delete sb;
+        }
+        else
+        {
+            ++it;
+        }
     }
 }
 
@@ -892,7 +937,8 @@ ClientHandle WEB::CLIENT::nextHandle()
     return next_handle_;
 }
 
-WEB::SENDBUF::SENDBUF(void *buf, uint32_t size, Allocation alloc) : buffer_((uint8_t *)buf), size_(size), sent_(0), allocated_(alloc)
+WEB::SENDBUF::SENDBUF(void *buf, uint32_t size, Allocation alloc)
+ : buffer_((uint8_t *)buf), size_(size), sent_(0), ack_(0), allocated_(alloc)
 {
     if (allocated_ == ALLOC)
     {
@@ -948,4 +994,25 @@ void WEB::SENDBUF::requeue(void *buffer, u16_t buflen)
     {
         WEB::get()->log_->print("%d bytes to requeue exceeds %d sent\n", buflen, sent_);
     }
+}
+
+int32_t WEB::SENDBUF::acknowledge(int count)
+{
+    int32_t na = ack_ + count;
+    if (na > size_)
+    {
+        ack_ = size_;
+        na -= size_;
+    }
+    else
+    {
+        ack_ = na;
+        na = 0;
+    }
+
+    if (ack_ > sent_)
+    {
+        WEB::get()->log_->print("ERROR: Acknowledge count exceeds sent count\n");
+    }
+    return na;
 }

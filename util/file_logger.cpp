@@ -33,7 +33,7 @@ int FileLogger::print(const char *format, ...)
     time(&now);
     if (last_timestamp_ != 0 && now - last_timestamp_ > 15 * 60)
     {
-        printf("%s", ctime(&now));
+        printf("%s\n", timestamp(&now));
     }
     int ret = vprintf(format, ap);
 
@@ -42,7 +42,7 @@ int FileLogger::print(const char *format, ...)
     {
         if (last_timestamp_ != 0 && now - last_timestamp_ > 15 * 60)
         {
-            fprintf(f, "%s", ctime(&now));
+            fprintf(f, "%s\n", timestamp(&now));
             ++line_count_;
             last_timestamp_ = now;
         }
@@ -179,5 +179,12 @@ void FileLogger::count_lines()
 void FileLogger::initialize_timestamps()
 {
     time(&last_timestamp_);
-    print("Time initialized at UTC %s", ctime(&last_timestamp_));
+    print("Time initialized at %s\n", timestamp(&last_timestamp_));
+}
+
+const char *FileLogger::timestamp(const time_t *ts) const
+{
+    static char timbuf[32];
+    strftime(timbuf, sizeof(timbuf), "%c %Z", localtime(ts));
+    return timbuf;
 }

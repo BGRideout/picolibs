@@ -18,6 +18,7 @@ private:
     time_t      last_timestamp_;        // Last timestamp printed
 
     void count_lines();
+    const char *timestamp(const time_t *ts) const;
 
 public:
     /**
