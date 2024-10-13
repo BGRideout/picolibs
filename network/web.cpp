@@ -17,9 +17,15 @@
 WEB *WEB::singleton_ = nullptr;
 int WEB::debug_level_ = 0;
 
+#ifndef HTTP_IDLE_TIME
 #define HTTP_IDLE_TIME  10      // Maximum idle time of HTTP connction (minutes)
-#define WS_IDLE_TIME    30      // Maximum idle time of websocket connction (minutes)
+#endif
+#ifndef WS_IDLE_TIME
+#define WS_IDLE_TIME     0      // Maximum idle time of websocket connction (minutes)
+#endif
+#ifndef WS_CLOSE_WAIT
 #define WS_CLOSE_WAIT    2      // Time to wait for response to websocket close (minutes)
+#endif
 
 WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
@@ -488,17 +494,15 @@ void WEB::open_websocket(CLIENT &client)
         size_t b64ll;
         mbedtls_base64_encode(b64, sizeof(b64), &b64ll, sha1, sizeof(sha1));
 
-        static char resp[]=
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: ";
+        std::string resp("HTTP/1.1 101 Switching Protocols\r\n"
+                         "Upgrade: websocket\r\n"
+                         "Connection: Upgrade\r\n"
+                         "Sec-WebSocket-Accept: ");
 
-        static char crlfcrlf[] = "\r\n\r\n";
+        resp.append((const char *)b64, b64ll);
+        resp += "\r\n\r\n";
 
-        send_buffer(client.pcb(), resp, strlen(resp), WEB::STAT);
-        send_buffer(client.pcb(), b64, b64ll);
-        send_buffer(client.pcb(), crlfcrlf, 4);
+        send_buffer(client.pcb(), (void *)resp.c_str(), resp.length());
 
         client.setWebSocket();
         client.clearRqst();
@@ -574,6 +578,15 @@ void WEB::broadcast_websocket(const std::string &txt)
         {
             send_websocket(it->second->pcb(), WEBSOCKET_OPCODE_TEXT, txt);
         }
+    }
+}
+
+void WEB::modifyURL(ClientHandle client, const std::string &newurl)
+{
+    CLIENT *clptr = findClient(client);
+    if (clptr)
+    {
+        clptr->http().setURL(newurl);
     }
 }
 
@@ -788,11 +801,6 @@ WEB::CLIENT::~CLIENT()
         delete sendbuf_.front();
         sendbuf_.pop_front();
     }
-    while (sentbuf_.size() > 0)
-    {
-        delete sentbuf_.front();
-        sentbuf_.pop_front();
-    }
 }
 
 void WEB::CLIENT::addToRqst(const char *str, u16_t ll)
@@ -827,18 +835,10 @@ bool WEB::CLIENT::get_next(u16_t count, void **buffer, u16_t *buflen)
     *buflen = 0;
     if (count > 0)
     {
-        while (*buflen == 0 && sendbuf_.size() > 0)
+        acknowledge(0);
+        if (sendbuf_.size() > 0 && sendbuf_.front()->to_send() > 0)
         {
-            if (sendbuf_.front()->to_send() > 0)
-            {
-                ret = sendbuf_.front()->get_next(count, buffer, buflen);
-            }
-            else
-            {
-                sentbuf_.push_back(sendbuf_.front());
-                sendbuf_.pop_front();
-                acknowledge(0);
-            }
+            ret = sendbuf_.front()->get_next(count, buffer, buflen);
         }
     }
 
@@ -855,33 +855,18 @@ void WEB::CLIENT::requeue(void *buffer, u16_t buflen)
 
 void WEB::CLIENT::acknowledge(int count)
 {
-    for (auto it = sentbuf_.begin(); count > 0 && it != sentbuf_.end(); )
-    {
-        SENDBUF *sb = sentbuf_.front();
-        count = sb->acknowledge(count);
-        if (sb->isAcknowledged())
-        {
-            it = sentbuf_.erase(it);
-            delete sb;
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    for (auto it = sendbuf_.begin(); count > 0 && it != sendbuf_.end(); )
+    while (sendbuf_.size() > 0)
     {
         SENDBUF *sb = sendbuf_.front();
         count = sb->acknowledge(count);
         if (sb->isAcknowledged())
         {
-            it = sendbuf_.erase(it);
+            sendbuf_.pop_front();
             delete sb;
         }
-        else
+        if (count == 0)
         {
-            ++it;
+            break;
         }
     }
 }
@@ -917,8 +902,31 @@ void WEB::CLIENT::resetRqst()
 
 bool WEB::CLIENT::isIdle() const
 {
-    int64_t idle = absolute_time_diff_us(last_activity_, get_absolute_time()) / 60000000LL;
-    return !isClosed() && websocket_ ? idle > (wasWSCloseSent() ? WS_CLOSE_WAIT : WS_IDLE_TIME) : idle > HTTP_IDLE_TIME;
+    bool ret = false;
+    if (!isClosed())
+    {
+        int64_t idle = absolute_time_diff_us(last_activity_, get_absolute_time()) / 60000000LL;
+        if (isWebSocket())
+        {
+            #if WS_IDLE_TIME > 0
+                if (wasWSCloseSent())
+                {
+                    ret = idle > WS_CLOSE_WAIT;
+                }
+                else
+                {
+                    ret = idle > WS_IDLE_TIME;
+                }
+            #endif    
+        }
+        else
+        {
+            #if HTTP_IDLE_TIME > 0
+                ret = idle > HTTP_IDLE_TIME;
+            #endif
+        }
+    }
+    return ret;
 }
 
 ClientHandle WEB::CLIENT::next_handle_ = 999;

@@ -39,6 +39,8 @@ public:
     std::string root() const;
     std::string filetype() const;
     std::string query(const std::string &key) const;
+    
+    void setURL(const std::string &newurl);
 
     int headerIndex(const std::string &name, int from=0) const;
     std::pair<std::string, std::string> header(int index) const;

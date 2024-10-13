@@ -88,7 +88,6 @@ private:
         bool                    ws_close_sent_;     // Web socket close sent
 
         std::list<SENDBUF *>    sendbuf_;           // Send buffers
-        std::list<SENDBUF *>    sentbuf_;           // Buffers waiting ack of send
         HTTPRequest             http_;              // HTTP request info
         WebsocketPacketHeader_t wshdr_;             // Websocket message header
 
@@ -129,7 +128,7 @@ private:
 ; 
         void queue_send(void *buffer, u16_t buflen, Allocation allocate);
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
-        bool more_to_send(bool quick=true) const { return sendbuf_.size() > 0 || sentbuf_.size() > 0; }
+        bool more_to_send(bool quick=true) const { return sendbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
         void acknowledge(int count);
 
@@ -337,7 +336,7 @@ public:
     bool send_data(ClientHandle client, const char *data, u16_t datalen, Allocation allocate=ALLOC);
 
     /**
-     * @brief   Send a tet message on websocket
+     * @brief   Send a text message on websocket
      * 
      * @param   client      Handle of client connection
      * @param   data        Pointr to data buffer
@@ -346,6 +345,16 @@ public:
      * @return  true if send queued successfully
      */
     bool send_message(ClientHandle client, const std::string &message);
+
+    /**
+     * @brief   Modify client URL
+     * 
+     * @details Useful in POST routines that want to directly their corresponding GET
+     * 
+     * @param   client      Handle of client connection
+     * @param   newurl      New URL string
+     */
+    void modifyURL(ClientHandle client, const std::string &newurl);
 
     /**
      * @brief   Enable this device to act as a WiFI access point

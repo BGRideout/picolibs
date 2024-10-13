@@ -126,6 +126,27 @@ std::string HTTPRequest::query(const std::string &key) const
     return ret;
 }
 
+void HTTPRequest::setURL(const std::string &newurl)
+{
+    if (headers_.size() > 0)
+    {
+        std::string &hdr = headers_.at(0);
+        std::size_t i1 = hdr.find(' ');
+        if (i1 != std::string::npos)
+        {
+            i1 = hdr.find_first_not_of(' ', i1);
+            if (i1 != std::string::npos)
+            {
+                std::size_t i2 = hdr.find(' ', i1);
+                if (i2 != std::string::npos)
+                {
+                    hdr.replace(i1, i2 - i1, newurl);
+                }
+            }
+        }
+    }
+}
+
 int HTTPRequest::headerIndex(const std::string &name, int from) const
 {
     int ret = -1;
