@@ -581,15 +581,6 @@ void WEB::broadcast_websocket(const std::string &txt)
     }
 }
 
-void WEB::modifyURL(ClientHandle client, const std::string &newurl)
-{
-    CLIENT *clptr = findClient(client);
-    if (clptr)
-    {
-        clptr->http().setURL(newurl);
-    }
-}
-
 void WEB::mark_for_close(struct altcp_pcb *client_pcb)
 {
     CLIENT *client = findClient(client_pcb);

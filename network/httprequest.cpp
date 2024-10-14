@@ -269,8 +269,8 @@ bool HTTPRequest::get_post_urlencoded()
             else
             {
                 value.clear();
-		valptr = cp;
-		*cp = 0;
+                valptr = cp;
+                *cp = 0;
             }
             post_data_.insert(std::pair<std::string, const char *>(key, valptr));
         }
@@ -387,6 +387,17 @@ const char *HTTPRequest::postValue(const std::string &key) const
     if (it.first != it.second)
     {
         ret = it.first->second;
+    }
+    return ret;
+}
+
+char *HTTPRequest::postValue(const std::string &key)
+{
+    char *ret = nullptr;
+    auto it = post_data_.equal_range(key);
+    if (it.first != it.second)
+    {
+        ret = const_cast<char *>(it.first->second);
     }
     return ret;
 }

@@ -203,7 +203,7 @@ private:
     err_t send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, Allocation allocate = ALLOC);
     err_t write_next(struct altcp_pcb *client_pcb);
 
-    bool (*http_callback_)(WEB *web, ClientHandle client, const HTTPRequest &rqst, bool &close);
+    bool (*http_callback_)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close);
     void (*message_callback_)(WEB *web, ClientHandle client, const std::string &msg);
     void (*notice_callback_)(int state);
     void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
@@ -276,7 +276,7 @@ public:
      *          -Callback to return true if it handled the request. If returns false,
      *          an error response is sent to client and connection is closed.
      */
-    void set_http_callback(bool (*cb)(WEB *web, ClientHandle client, const HTTPRequest &rqst, bool &close)) { http_callback_ = cb; }
+    void set_http_callback(bool (*cb)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)) { http_callback_ = cb; }
 
     /**
      * @brief   Set callback for receipt of websocket tet message
@@ -345,16 +345,6 @@ public:
      * @return  true if send queued successfully
      */
     bool send_message(ClientHandle client, const std::string &message);
-
-    /**
-     * @brief   Modify client URL
-     * 
-     * @details Useful in POST routines that want to directly their corresponding GET
-     * 
-     * @param   client      Handle of client connection
-     * @param   newurl      New URL string
-     */
-    void modifyURL(ClientHandle client, const std::string &newurl);
 
     /**
      * @brief   Enable this device to act as a WiFI access point

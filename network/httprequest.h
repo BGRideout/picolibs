@@ -55,6 +55,7 @@ public:
 
     const PostData &postData() const { return post_data_; }
     const char *postValue(const std::string &key) const;
+    char *postValue(const std::string &key);
     int postArray(const std::string &key, std::vector<const char *> &array) const;
     void printPostData() const;
 
