@@ -20,6 +20,7 @@ private:
     std::size_t                     body_size_;         // Body size
     char                            *body_;             // Pointer to body string
     PostData                        post_data_;         // POST data
+    std::string                     user_data_;         // User data
 
     bool get_post();
     bool get_post_urlencoded();
@@ -67,6 +68,9 @@ public:
 
     bool isComplete() const { return body_ != nullptr; }
     void clear() { headers_.clear(); body_offset_ = 0; body_size_ = 0; body_ = nullptr; post_data_.clear(); }
+
+    const std::string &userData() const { return user_data_; }
+    void setUserData(const std::string &data) { user_data_ = data; }
 };
 
 #endif
