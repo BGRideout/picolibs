@@ -15,7 +15,7 @@ queue_t     Button::queue_;
 
 Button::Button(uint32_t id, uint32_t gpio, uint32_t hold_time, uint32_t click_time, uint32_t bounce_time)
   : id_(id), gpio_(gpio), bounce_(-1), click_(-1), hold_(-1),
-    bounce_time_(bounce_time), click_time_(click_time), hold_time_(hold_time), btn_cb_(nullptr)
+    bounce_time_(bounce_time), click_time_(click_time), hold_time_(hold_time), btn_cb_(nullptr), user_data_(nullptr)
 {
     if (buttons_ == nullptr)
     {
@@ -211,7 +211,7 @@ void Button::notify(ButtonAction action)
     ButtonEvent ev = {time_us_64(), id_, action};
     if (btn_cb_)
     {
-        btn_cb_(ev);
+        btn_cb_(ev, user_data_);
     }
     else
     {

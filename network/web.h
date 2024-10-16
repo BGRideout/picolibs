@@ -203,10 +203,13 @@ private:
     err_t send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, Allocation allocate = ALLOC);
     err_t write_next(struct altcp_pcb *client_pcb);
 
-    bool (*http_callback_)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close);
-    void (*message_callback_)(WEB *web, ClientHandle client, const std::string &msg);
-    void (*notice_callback_)(int state);
-    void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
+    bool (*http_callback_)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close, void *user_data);
+    void *http_user_data_;
+    void (*message_callback_)(WEB *web, ClientHandle client, const std::string &msg, void *user_data);
+    void *message_user_data_;
+    void (*notice_callback_)(int state, void *user_data);
+    void *notice_user_data_;
+    void send_notice(int state) {if (notice_callback_) notice_callback_(state, notice_user_data_);}
 
 public:
     /**
@@ -264,6 +267,7 @@ public:
      * @brief   Set callback for receipt of HTTP message
      * 
      * @param   cb          Pointer to callback function
+     * @param   user_data   User data passed to callback
      * 
      * @details Callback function takes the following parameters:
      * 
@@ -272,14 +276,16 @@ public:
      *              -rqst   HTTP request object
      *              -close  boolean initially set to true. Called function can
      *                      set it to false to keep connection open after return
+     *              -udata  User data
      * 
      *          -Callback to return true if it handled the request. If returns false,
      *          an error response is sent to client and connection is closed.
      */
-    void set_http_callback(bool (*cb)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)) { http_callback_ = cb; }
+    void set_http_callback(bool (*cb)(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close, void *udata), void *user_data = nullptr)
+                         { http_callback_ = cb; http_user_data_ = user_data; }
 
     /**
-     * @brief   Set callback for receipt of websocket tet message
+     * @brief   Set callback for receipt of websocket text message
      * 
      * @param   cb          Pointer to callbck function
      * 
@@ -287,14 +293,16 @@ public:
      * 
      *              -web    Pointer to the WEB object
      *              -client Handle to client connection
-     *              -msg    Payload of tet message
+     *              -msg    Payload of text message
+     *              -udata  User data
      */
-    void set_message_callback(void(*cb)(WEB *web, ClientHandle client, const std::string &msg)) { message_callback_ = cb; }
+    void set_message_callback(void(*cb)(WEB *web, ClientHandle client, const std::string &msg, void *udata), void *user_data = nullptr)
+                             { message_callback_ = cb; message_user_data_ = user_data; }
 
     /**
      * @brief   Send a tet message to all connected websockets
      * 
-     * @param   txt         Message t be sent
+     * @param   txt         Message to be sent
      */
     void broadcast_websocket(const std::string &txt);
 
@@ -311,8 +319,10 @@ public:
      *                      +STA_DISCONNECTED   Disconnected from WiFI access point
      *                      +AP_ACTIVE          Device is acting as a WiFI access point
      *                      +AP_INACTIVE        Device has stopped acting as access point
+     *              -udata  User data
      */
-    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
+    void set_notice_callback(void(*cb)(int state, void *udata), void *user_data = nullptr)
+                             { notice_callback_ = cb; notice_user_data_ = user_data; }
     static const int STA_INITIALIZING = 101;
     static const int STA_CONNECTED = 102;
     static const int STA_DISCONNECTED = 103;

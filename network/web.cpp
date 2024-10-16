@@ -29,7 +29,9 @@ int WEB::debug_level_ = 0;
 
 WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
-             http_callback_(nullptr), message_callback_(nullptr), notice_callback_(nullptr)
+             http_callback_(nullptr), http_user_data_(nullptr),
+             message_callback_(nullptr), message_user_data_(nullptr),
+             notice_callback_(nullptr), notice_user_data_(nullptr)
 {
     log_ = &default_logger_;
 }
@@ -351,10 +353,10 @@ void WEB::tcp_server_err(void *arg, err_t err)
     WEB *web = get();
     altcp_pcb *client_pcb = (altcp_pcb *)arg;
     CLIENT *client = web->findClient(client_pcb);
-    if (isDebug(1)) WEB::get()->log_->print("Error %d on client %p (%d)\n", err, client_pcb, client ? client->handle() : 0);
+    WEB::get()->log_->print("Error %d on client %p (%d)\n", err, client_pcb, client ? client->handle() : 0);
     if (client)
     {
-        web->close_client(client_pcb, true);
+        web->deleteClient(client_pcb);
     }
 }
 
@@ -449,7 +451,7 @@ void WEB::process_http_rqst(CLIENT &client, bool &close)
     const char *data;
     u16_t datalen = 0;
     bool is_static = false;
-    if (http_callback_ && http_callback_(this, client.handle(), client.http(), close))
+    if (http_callback_ && http_callback_(this, client.handle(), client.http(), close, http_user_data_))
     {
         ;
     }
@@ -524,7 +526,7 @@ void WEB::process_websocket(CLIENT &client)
     case WEBSOCKET_OPCODE_TEXT:
         if (message_callback_)
         {
-            message_callback_(this, client.handle(), payload);
+            message_callback_(this, client.handle(), payload, message_user_data_);
         }
         break;
 

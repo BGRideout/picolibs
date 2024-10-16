@@ -30,7 +30,7 @@ public:
         ButtonAction    action;
     };
 
-    typedef void (*button_cb_t)(struct ButtonEvent &ev);
+    typedef void (*button_cb_t)(struct ButtonEvent &ev, void *user_data);
 
 private:
     uint32_t            id_;                // Button ID
@@ -68,6 +68,7 @@ private:
 
     void notify(ButtonAction action);
     button_cb_t btn_cb_;
+    void *user_data_;
 
 public:
     /**
@@ -105,9 +106,10 @@ public:
     /**
      * @brief   Set callback to be used instead of event queue
      * 
-     * @param   btn_cb  Callback function (null turns off callback)
+     * @param   btn_cb      Callback function (null turns off callback)
+     * @param   user_data   User data passed to callbck
      */
-    void setEventCallback(button_cb_t cb) { btn_cb_ = cb; }
+    void setEventCallback(button_cb_t cb, void *user_data = nullptr) { btn_cb_ = cb; user_data_ = user_data; }
 };
 
 #endif
