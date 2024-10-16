@@ -631,6 +631,7 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
         {
             if (isDebug(1)) log_->print("Closing %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             client->setClosed();
+            altcp_close(client_pcb);
             deleteClient(client_pcb);
         }
     }
