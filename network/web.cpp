@@ -184,7 +184,27 @@ bool WEB::update_wifi(const std::string &hostname, const std::string &ssid, cons
     {
         cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
         ret = connect_to_wifi(hostname, ssid, password);
-        mdns_resp_rename_netif(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
+    }
+    else
+    {
+        switch (wifi_state_)
+        {
+        case CYW43_LINK_JOIN:
+        case CYW43_LINK_NOIP:
+            send_notice(STA_INITIALIZING);
+            break;
+
+        case CYW43_LINK_UP:
+            send_notice(STA_CONNECTED);
+            break;
+
+        case CYW43_LINK_DOWN:
+        case CYW43_LINK_FAIL:
+        case CYW43_LINK_NONET:
+        case CYW43_LINK_BADAUTH:
+            send_notice(STA_DISCONNECTED);
+            break;
+        }
     }
     return ret;
 }
@@ -343,6 +363,7 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
         else
         {
             web->log_->print("Poll on closed pcb %p (client %d)\n", tpcb, client->handle());
+            web->close_client(tpcb);
         }
     }
     return ERR_OK;
