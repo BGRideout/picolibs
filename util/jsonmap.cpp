@@ -112,7 +112,8 @@ bool JSONMap::fromMap(const JMAP &jmap, std::string &str)
 int JSONMap::itemCount(const char *jsonstr)
 {
     int ret = 0;
-    char startchar = *jsonstr++;
+    const char *str = jsonstr;
+    char startchar = *str++;
     char endchar = '\0';
     if (startchar == '{')
     {
@@ -124,52 +125,54 @@ int JSONMap::itemCount(const char *jsonstr)
     }
     else
     {
-        printf("JSON string does not start with '{' or '[' found 0x'%2.2x'\n", startchar);
+        printf("JSON string '%.16s ...'does not start with '{' or '[' found 0x'%2.2x'\n", jsonstr, startchar);
         return 0;
     }
     int depth = 1;
     bool quoted = false;
     ret += 2;
-    while (*jsonstr != '\0' && depth > 0)
+    while (*str != '\0' && depth > 0)
     {
-        if (!quoted && (*jsonstr == '{' || *jsonstr == '['))
+        if (!quoted && (*str == '{' || *str == '['))
         {
             ++depth;
             ret += 1;
         }
-        else if (!quoted && (*jsonstr == '}' || *jsonstr == ']'))
+        else if (!quoted && (*str == '}' || *str == ']'))
         {
             --depth;
         }
-        else if (!quoted && *jsonstr == ',')
+        else if (!quoted && *str == ',')
         {
             ret += 1;
         }
-        else if (!quoted && *jsonstr == '"')
+        else if (!quoted && *str == '"')
         {
             quoted == true;
         }
-        else if (quoted && *jsonstr == '"')
+        else if (quoted && *str == '"')
         {
-            if (jsonstr [-1] != '\\')
+            if (str [-1] != '\\')
             {
                 quoted = false;
             }
         }
-        ++jsonstr;
+        ++str;
     }
 
     if (depth == 0)
     {
-        while (*jsonstr != '\0' && isspace(*jsonstr))
+        while (*str != '\0' && isspace(*str))
         {
-            ++jsonstr;
+            ++str;
         }
     }
 
-    if (*jsonstr != '\0' || depth > 0)
+    if (*str != '\0' || depth > 0)
     {
-        printf("Suspicious character '%c' after close of JSON object\n", *jsonstr);
+        int ll = strlen(jsonstr) - 16;
+        if (ll < 0) ll = 0;
+        printf("Suspicious character '%c' after close of JSON object '... %.16s'\n", *str, &jsonstr[ll]);
     }
     return ret;
 }
