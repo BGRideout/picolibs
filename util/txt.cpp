@@ -22,7 +22,7 @@ char *TXT::expand(uint32_t offset, uint32_t amount)
         uint32_t newsz = endptr_ + amount + 2048;
         newsz /= 2048;
         newsz *= 2048;
-        printf("TXT buffer expanded from %d to %d for epansion by %d from %d to %d\n", bufsiz_, newsz, amount, endptr_, endptr_ + amount);
+        printf("TXT buffer expanded from %d to %d for expansion by %d from %d to %d\n", bufsiz_, newsz, amount, endptr_, endptr_ + amount);
         char *newbuf = new char[newsz];
         memcpy(newbuf, buffer_, endptr_ + 1);
         delete [] buffer_;

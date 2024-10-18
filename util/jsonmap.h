@@ -35,6 +35,8 @@ public:
     typedef std::map<std::string, std::string> JMAP;
     static bool fromMap(const JMAP &jmap, std::string &str);
 
+    static int itemCount(const char *jsonstr);
+
     void clear();
 };
 
