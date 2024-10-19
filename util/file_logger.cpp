@@ -29,6 +29,31 @@ int FileLogger::print(const char *format, ...)
     va_list ap;
     va_start(ap, format);
 
+    int ret = vprint(format, ap);
+
+    va_end(ap);
+    return ret;
+}
+
+int FileLogger::print_debug(int level, const char *format, ...)
+{
+    int ret = 0;
+
+    if (isDebug(level))
+    {
+        va_list ap;
+        va_start(ap, format);
+
+        ret = vprint(format, ap);
+
+        va_end(ap);
+    }
+    return ret;
+}
+
+
+int FileLogger::vprint(const char *format, va_list ap)
+{
     time_t now;
     time(&now);
     if (last_timestamp_ != 0 && now - last_timestamp_ > 15 * 60)
@@ -66,7 +91,6 @@ int FileLogger::print(const char *format, ...)
         trim_file();
     }
 
-    va_end(ap);
     return ret;
 }
 

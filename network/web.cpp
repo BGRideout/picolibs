@@ -15,7 +15,6 @@
 #include "mbedtls/debug.h"
 
 WEB *WEB::singleton_ = nullptr;
-int WEB::debug_level_ = 0;
 
 #ifndef HTTP_IDLE_TIME
 #define HTTP_IDLE_TIME  10      // Maximum idle time of HTTP connction (minutes)
@@ -217,14 +216,14 @@ err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
         return ERR_VAL;
     }
     CLIENT *client = web->addClient(client_pcb);
-    if (isDebug(1)) WEB::get()->log_->print("Client connected %p (handle %d) (%d clients)\n", client_pcb, client->handle(), web->clientPCB_.size());
-    if (isDebug(3))
+    web->log_->print_debug(1, "Client connected %p (handle %d) (%d clients)\n", client_pcb, client->handle(), web->clientPCB_.size());
+    if (web->log_->isDebug(3))
     {
         for (auto it = web->clientHndl_.cbegin(); it != web->clientHndl_.cend(); ++it)
         {
-            WEB::get()->log_->print("  %c-%p (%d)", it->second->isWebSocket() ? 'w' : 'h', it->first, it->second->handle());
+            web->log_->print("  %c-%p (%d)", it->second->isWebSocket() ? 'w' : 'h', it->first, it->second->handle());
         }
-        if (web->clientHndl_.size() > 0) WEB::get()->log_->print("\n");
+        if (web->clientHndl_.size() > 0) web->log_->print("\n");
     }
 
     altcp_arg(client_pcb, client_pcb);
@@ -242,7 +241,7 @@ err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, er
     CLIENT *client = web->findClient(tpcb);
     if (!p)
     {
-        if (isDebug(1)) web->log_->print("Client %p (%d) closed by peer\n", tpcb, client ? client->handle() : 0);
+        web->log_->print_debug(1, "Client %p (%d) closed by peer\n", tpcb, client ? client->handle() : 0);
         web->close_client(tpcb, true);
         return ERR_OK;
     }
@@ -323,7 +322,7 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
         {
             if (client->more_to_send())
             {
-                if (isDebug(1)) WEB::get()->log_->print("Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
+                web->log_->print_debug(1, "Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
                 web->write_next(client->pcb());
             }
 
@@ -334,21 +333,21 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
                 {
                     if (!client->wasWSCloseSent())
                     {
-                        WEB::get()->log_->print("Closing websocket %p (%d) for idle (%d clients)\n",
+                        web->log_->print_debug(1, "Closing websocket %p (%d) for idle (%d clients)\n",
                                                 tpcb, client->handle(), web->clientPCB_.size());
                         client->setWSCloseSent();
                         web->send_websocket(client->pcb(), WEBSOCKET_OPCODE_CLOSE, std::string());
                     }
                     else
                     {
-                        WEB::get()->log_->print("Closing websocket %p (%d) after no response to close (%d clients)\n",
+                        web->log_->print_debug(1, "Closing websocket %p (%d) after no response to close (%d clients)\n",
                                                 tpcb, client->handle(), web->clientPCB_.size());
                         web->mark_for_close(tpcb);
                     }
                 }
                 else
                 {
-                    WEB::get()->log_->print("Closing http %p (%d) for idle (%d clients)\n",
+                   web->log_->print_debug(1, "Closing http %p (%d) for idle (%d clients)\n",
                                             tpcb, client->handle(), web->clientPCB_.size());
                     web->mark_for_close(tpcb);
                 }
@@ -437,7 +436,7 @@ void WEB::process_rqst(CLIENT &client)
     bool ok = false;
     bool close = true;
     client.activity();
-    if (isDebug(2)) log_->print("Request from %p (%d):\n%s\n", client.pcb(), client.handle(), client.rqst().c_str());
+    log_->print_debug(2, "Request from %p (%d):\n%s\n", client.pcb(), client.handle(), client.rqst().c_str());
     if (!client.isWebSocket())
     {
         ok = true;
@@ -499,7 +498,7 @@ bool WEB::send_data(ClientHandle client, const char *data, u16_t datalen, Alloca
 
 void WEB::open_websocket(CLIENT &client)
 {
-    if (isDebug(1)) log_->print("Accepting websocket connection on %p (handle %d)\n", client.pcb(), client.handle());
+    log_->print_debug(1, "Accepting websocket connection on %p (handle %d)\n", client.pcb(), client.handle());
     std::string host = client.http().header("Host");
     std::string key = client.http().header("Sec-WebSocket-Key");
     
@@ -556,7 +555,7 @@ void WEB::process_websocket(CLIENT &client)
         break;
 
     case WEBSOCKET_OPCODE_CLOSE:
-        if (isDebug(1)) log_->print("WS %p (%d) received close opcode\n", client.pcb(), client.handle());
+        log_->print_debug(1, "WS %p (%d) received close opcode\n", client.pcb(), client.handle());
         if (!client.wasWSCloseSent())
         {
             client.setWSCloseSent();
@@ -576,7 +575,7 @@ bool WEB::send_message(ClientHandle client, const std::string &message)
     CLIENT *clpcb = findClient(clptr->pcb());
     if (clptr && clpcb == clptr)
     {
-        if (isDebug(2)) log_->print("%p (%d) message: %s\n", clptr->pcb(), clptr->handle(), message.c_str());
+        log_->print_debug(2, "%p (%d) message: %s\n", clptr->pcb(), clptr->handle(), message.c_str());
         send_websocket(clptr->pcb(), WEBSOCKET_OPCODE_TEXT, message);
     }
     else
@@ -627,10 +626,10 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
                 err_t csts = altcp_close(client_pcb);
                 if (csts == ERR_OK)
                 {
-                    if (isDebug(1)) log_->print("Closed %s %p (%d). client count = %d\n",
+                    log_->print_debug(1, "Closed %s %p (%d). client count = %d\n",
                                     (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), clientPCB_.size() - 1);
                     deleteClient(client_pcb);
-                    if (isDebug(3))
+                    if (log_->isDebug(3))
                     {
                         for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
                         {
@@ -641,18 +640,18 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
                 }
                 else
                 {
-                    if (isDebug(1)) log_->print("Deferred close of %s %s %p (%d). status = %d\n",
+                    log_->print_debug(1, "Deferred close of %s %s %p (%d). status = %d\n",
                                     (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle(), csts);
                 }
             }
             else
             {
-                if (isDebug(1)) log_->print("Waiting to close %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
+                log_->print_debug(1, "Waiting to close %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             }
         }
         else
         {
-            if (isDebug(1)) log_->print("Closing %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
+            log_->print_debug(1, "Closing %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             client->setClosed();
             altcp_close(client_pcb);
             deleteClient(client_pcb);
@@ -663,7 +662,7 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
         if (!isClosed)
         {
             err_t csts = altcp_close(client_pcb);
-            if (isDebug(1)) log_->print("Close status %p  = %d\n", client_pcb, csts);
+            log_->print_debug(1, "Close status %p  = %d\n", client_pcb, csts);
         }   
     }
 }

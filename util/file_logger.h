@@ -4,6 +4,7 @@
 #define FILE_LOGGER_H
 
 #include "logger.h"
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
@@ -19,6 +20,7 @@ private:
 
     void count_lines();
     const char *timestamp(const time_t *ts) const;
+    int vprint(const char *format, va_list ap);
 
 public:
     /**
@@ -39,6 +41,11 @@ public:
      * @brief   Print method with same function as printf
      */
     int print(const char *format, ...) override;
+
+    /**
+     * @brief   Print method with same function as printf if at specified debug level
+     */
+    int print_debug(int level, const char *format, ...) override;
 
     /**
      * @brief   Trim file to trimmed_lines line count

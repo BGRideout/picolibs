@@ -191,9 +191,6 @@ private:
 
     static struct netif *wifi_netif(int ift) { return &cyw43_state.netif[ift]; }
 
-    static int debug_level_;                               // Debug level
-    static bool isDebug(int level = 1) { return level <= debug_level_; }
-
     Logger              default_logger_;            // Default logger
     Logger              *log_;                      // Active logger
     
@@ -394,7 +391,7 @@ public:
      * 
      * @param   level       Debug level (0=minimal, higher numbers for more detail)
      */
-    void setDebug(int level) { debug_level_ = level; }
+    void setDebug(int level) { log_->setDebug(level); }
 
     /**
      * @brief   Set logger
