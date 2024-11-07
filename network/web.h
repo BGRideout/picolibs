@@ -207,6 +207,7 @@ private:
     void (*notice_callback_)(int state, void *user_data);
     void *notice_user_data_;
     void send_notice(int state) {if (notice_callback_) notice_callback_(state, notice_user_data_);}
+    void (*tls_callback_)(WEB *web, std::string &cert, std::string &pkey, std::string &pwd);
 
 public:
     /**
@@ -325,6 +326,21 @@ public:
     static const int STA_DISCONNECTED = 103;
     static const int AP_ACTIVE = 104;
     static const int AP_INACTIVE = 105;
+
+    /**
+     * @brief   Set TLS setup callbck (must be called before init)
+     * 
+     * @param   cb          Callback to get certificate and key data
+     * 
+     * @details Callback function takes the following parameters:
+     * 
+     *              -web    Pointer to the WEB object
+     *              -cert   String to receive X.509 certificate
+     *              -pkey   String to receive private key
+     *              -pkpass String to receive private key passphrase
+     */
+    void set_tls_callback(void(*cb)(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass))
+                        {tls_callback_ = cb;}
 
     /**
      * @brief   Send HTTP message

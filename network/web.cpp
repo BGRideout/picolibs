@@ -30,7 +30,8 @@ WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
              http_callback_(nullptr), http_user_data_(nullptr),
              message_callback_(nullptr), message_user_data_(nullptr),
-             notice_callback_(nullptr), notice_user_data_(nullptr)
+             notice_callback_(nullptr), notice_user_data_(nullptr),
+             tls_callback_(nullptr)
 {
     log_ = &default_logger_;
 }
@@ -54,35 +55,45 @@ bool WEB::init()
 
     mdns_resp_init();
 
+#if SNTP_SERVER_DNS
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, "pool.ntp.org");
     sntp_init();
+#endif
+
+    u16_t port;
+    altcp_allocator_t alloc;
 
 #ifdef USE_HTTPS
-    u16_t port = LWIP_IANA_PORT_HTTPS;
-    const char *pkey;
-    uint16_t    pkeylen;
-    get_file_("newkey.pem", pkey, pkeylen);
-    const char pkpass[] = "webmouse";
-    uint16_t pkpasslen = sizeof(pkpass);
-    const char *cert;
-    uint16_t    certlen;
-    get_file_("newcert.pem", cert, certlen);
-    
-    struct altcp_tls_config * conf = altcp_tls_create_config_server_privkey_cert((const u8_t *)pkey, pkeylen + 1,
-                                                                                 (const u8_t *)pkpass, pkpasslen,
-                                                                                 (const u8_t *)cert, certlen + 1);
-    if (!conf)
+    if (tls_callback_)
     {
-        log_->print("TLS configuration not loaded\n");
-    }
-    mbedtls_debug_set_threshold(1);
+        port = LWIP_IANA_PORT_HTTPS;
+        std::string cert;
+        std::string pkey;
+        std::string pkpass;
+        tls_callback_(this, cert, pkey, pkpass);
+        struct altcp_tls_config * conf = altcp_tls_create_config_server_privkey_cert((const u8_t *)pkey.c_str(), pkey.length() + 1,
+                                                                                    (const u8_t *)pkpass.c_str(), pkpass.length() + 1,
+                                                                                    (const u8_t *)cert.c_str(), cert.length() + 1);
+        if (!conf)
+        {
+            log_->print("TLS configuration not loaded\n");
+        }
+        mbedtls_debug_set_threshold(1);
 
-    altcp_allocator_t alloc = {altcp_tls_alloc, conf};
+        alloc = {altcp_tls_alloc, conf};
+    }
+    else
+    {
+        log_->print("No TLS configuration callback. Using HTTP\n");
+        port = LWIP_IANA_PORT_HTTP;
+        struct altcp_tls_config * conf = nullptr;
+        alloc = {altcp_tcp_alloc, conf};
+    }
     #else
-    u16_t port = LWIP_IANA_PORT_HTTP;
+    port = LWIP_IANA_PORT_HTTP;
     struct altcp_tls_config * conf = nullptr;
-    altcp_allocator_t alloc = {altcp_tcp_alloc, conf};
+    alloc = {altcp_tcp_alloc, conf};
     #endif
 
     struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
