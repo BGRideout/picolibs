@@ -3,19 +3,65 @@
 */
 
 #include "led.h"
+#if LIB_PICO_CYW43_ARCH
+#include "pico/cyw43_arch.h"
+#endif
+#include <string.h>
+#include <stdlib.h>
 
 LED::LED(uint32_t gpio, bool state)
  : gpio_(gpio), flash_period_(0), flash_pattern_(1), flash_bits_(2), flash_index_(0), flasher_(-1)
 {
     gpio_init(gpio_);
     gpio_set_dir(gpio_, true);
-    gpio_put(gpio_, state);
+    set_led(state);
+}
+
+LED::LED(const char *led, bool state)
+ : gpio_(0xffffffff), flash_period_(0), flash_pattern_(1), flash_bits_(2), flash_index_(0), flasher_(-1)
+{
+    if (strcasecmp(led, "led") == 0)
+    {
+#ifndef CYW43_WL_GPIO_LED_PIN
+        gpio_ = PICO_DEFAULT_LED_PIN;
+        gpio_init(gpio_);
+        gpio_set_dir(gpio_, true);
+#endif
+    }
+    else
+    {
+        char *ep;
+        gpio_ = strtoul(led, &ep, 10);
+        gpio_init(gpio_);
+        gpio_set_dir(gpio_, true);
+    }
+    set_led(state);
 }
 
 LED::~LED()
 {
-    gpio_deinit(gpio_);
+    if (gpio_ != 0xffffffff)
+    {
+        gpio_deinit(gpio_);
+    }
 }
+
+void LED::set_led(bool state)
+{
+    if (gpio_ == 0xffffffff)
+    {
+#ifdef CYW43_WL_GPIO_LED_PIN
+        cyw43_thread_enter();
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, state);
+        cyw43_thread_exit();
+#endif
+    }
+    else
+    {
+        gpio_put(gpio_, state);
+    }
+}
+
 
 bool LED::setFlash(uint32_t period)
 {
@@ -60,13 +106,13 @@ bool LED::check_flash()
     if (pat == 0)
     {
         // All zeroes, turn off
-        gpio_put(gpio_, false);
+        set_led(false);
         ret = false;
     }
     else if (pat == mask)
     {
         // All ones, turn on
-        gpio_put(gpio_, true);
+        set_led(true);
         ret = false;
     }
     return ret;
@@ -84,7 +130,7 @@ int64_t LED::do_timer()
     if (flash_period_ > 0)
     {
         ret = flash_period_ / flash_bits_;
-        gpio_put(gpio_, (flash_pattern_ & (1 << flash_index_)) != 0);
+        set_led((flash_pattern_ & (1 << flash_index_)) != 0);
         if (++flash_index_ >= flash_bits_)
         {
             flash_index_ = 0;

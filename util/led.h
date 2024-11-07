@@ -22,6 +22,7 @@ private:
     static int64_t timer_cb(alarm_id_t id, void *udata);
     int64_t do_timer();
     bool check_flash();
+    void set_led(bool state);
 
 public:
     /**
@@ -31,6 +32,7 @@ public:
      * @param   state   Initial state of LED (true = on)
      */
     LED(uint32_t gpio, bool state=true);
+    LED(const char *led="LED", bool state=true);
 
     /**
      * @brief   Destructor for LED class
