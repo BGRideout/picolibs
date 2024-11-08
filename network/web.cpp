@@ -451,8 +451,7 @@ void WEB::process_rqst(CLIENT &client)
     if (!client.isWebSocket())
     {
         ok = true;
-        std::string url = client.http().url();
-        if (url == "/ws/")
+        if (client.http().header("Upgrade") == "websocket")
         {
             open_websocket(client);
         }
