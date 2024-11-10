@@ -54,7 +54,8 @@ public:
     };
 
 private:
-    struct altcp_pcb    *server_;               // Server PCB
+    struct altcp_pcb    *http_server_;          // HTTP Server PCB
+    struct altcp_pcb    *https_server_;         // HTTPS Server PCB
 
     class SENDBUF
     {
@@ -223,6 +224,48 @@ public:
      * @return  true if successfully initialized
      */
     bool init();
+
+    /**
+     * @brief   Start listening for HTTP connections
+     * 
+     * @return  true if listening
+     */
+    bool start_http();
+
+    /**
+     * @brief   Start listening for HTTPS connections
+     * 
+     * @return  true if listening
+     */
+    bool start_https();
+
+    /**
+     * @brief   Stop listening for HTTP connections
+     * 
+     * @return  true if previously listening
+     */
+    bool stop_http();
+
+    /**
+     * @brief   Stop listening for HTTPS connections
+     * 
+     * @return  true if previously listening
+     */
+    bool stop_https();
+
+    /**
+     * @brief   Test if listening for HTTP connections
+     * 
+     * @return  true if previously listening
+     */
+    bool is_http_listening() const {return http_server_ != nullptr;}
+
+    /**
+     * @brief   Test if listening for HTTPS connections
+     * 
+     * @return  true if previously listening
+     */
+    bool is_https_listening() const {return https_server_ != nullptr;}
 
     /**
      * @brief   Initiate a connection to a WiFi access point

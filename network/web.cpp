@@ -26,7 +26,7 @@ WEB *WEB::singleton_ = nullptr;
 #define WS_CLOSE_WAIT    2      // Time to wait for response to websocket close (minutes)
 #endif
 
-WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
+WEB::WEB() : http_server_(nullptr), https_server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
              http_callback_(nullptr), http_user_data_(nullptr),
              message_callback_(nullptr), message_user_data_(nullptr),
@@ -61,13 +61,64 @@ bool WEB::init()
     sntp_init();
 #endif
 
-    u16_t port;
-    altcp_allocator_t alloc;
-
+    bool listening = false;
 #ifdef USE_HTTPS
-    if (tls_callback_)
+    listening = start_https();
+#endif
+    if (!listening)
     {
-        port = LWIP_IANA_PORT_HTTPS;
+        listening = start_http();
+    }
+    
+    add_repeating_timer_ms(500, timer_callback, this, &timer_);
+
+    return true;
+}
+
+bool WEB::start_http()
+{
+    if (!http_server_)
+    {
+        cyw43_arch_lwip_begin();
+        u16_t port = LWIP_IANA_PORT_HTTP;
+        struct altcp_tls_config * conf = nullptr;
+        altcp_allocator_t alloc = {altcp_tcp_alloc, conf};
+        struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
+
+        err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
+        if (err)
+        {
+            cyw43_arch_lwip_end();
+            log_->print("failed to bind to port %u: %d\n", port, err);
+            return false;
+        }
+
+        http_server_ = altcp_listen_with_backlog(pcb, 1);
+        if (!http_server_)
+        {
+            log_->print("failed to listen to HTTP port\n");
+            if (pcb)
+            {
+                altcp_close(pcb);
+            }
+            cyw43_arch_lwip_end();
+            return false;
+        }
+
+        altcp_arg(http_server_, this);
+        altcp_accept(http_server_, tcp_server_accept);
+        cyw43_arch_lwip_end();
+    }
+    return true;
+}
+
+bool WEB::start_https()
+{
+#ifdef USE_HTTPS
+    if (!https_server_)
+    {
+        cyw43_arch_lwip_begin();
+        u16_t port = LWIP_IANA_PORT_HTTPS;
         std::string cert;
         std::string pkey;
         std::string pkpass;
@@ -78,50 +129,74 @@ bool WEB::init()
         if (!conf)
         {
             log_->print("TLS configuration not loaded\n");
+            cyw43_arch_lwip_end();
+            return false;
         }
         mbedtls_debug_set_threshold(1);
 
-        alloc = {altcp_tls_alloc, conf};
-    }
-    else
-    {
-        log_->print("No TLS configuration callback. Using HTTP\n");
-        port = LWIP_IANA_PORT_HTTP;
-        struct altcp_tls_config * conf = nullptr;
-        alloc = {altcp_tcp_alloc, conf};
-    }
-    #else
-    port = LWIP_IANA_PORT_HTTP;
-    struct altcp_tls_config * conf = nullptr;
-    alloc = {altcp_tcp_alloc, conf};
-    #endif
+        altcp_allocator_t alloc = {altcp_tls_alloc, conf};
+        struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
 
-    struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
-
-    err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
-    if (err)
-    {
-        log_->print("failed to bind to port %u: %d\n", port, err);
-        return false;
-    }
-
-    server_ = altcp_listen_with_backlog(pcb, 1);
-    if (!server_)
-    {
-        log_->print("failed to listen\n");
-        if (pcb)
+        err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
+        if (err)
         {
-            altcp_close(pcb);
+            log_->print("failed to bind to port %u: %d\n", port, err);
+            cyw43_arch_lwip_end();
+            return false;
         }
-        return false;
+
+        https_server_ = altcp_listen_with_backlog(pcb, 1);
+        if (!https_server_)
+        {
+            log_->print("failed to listen to HTTPS port\n");
+            if (pcb)
+            {
+                altcp_close(pcb);
+            }
+            cyw43_arch_lwip_end();
+            return false;
+        }
+
+        altcp_arg(https_server_, this);
+        altcp_accept(https_server_, tcp_server_accept);
+        cyw43_arch_lwip_end();
     }
-
-    altcp_arg(server_, this);
-    altcp_accept(server_, tcp_server_accept);
-    
-    add_repeating_timer_ms(500, timer_callback, this, &timer_);
-
     return true;
+#else
+    return false;
+#endif
+}
+
+bool WEB::stop_http()
+{
+    bool ret = false;
+    if (http_server_)
+    {
+        cyw43_arch_lwip_begin();
+        altcp_arg(http_server_, nullptr);
+        altcp_accept(http_server_, nullptr);
+        altcp_close(http_server_);
+        cyw43_arch_lwip_end();
+        http_server_ = nullptr;
+        ret = true;
+    }
+    return ret;
+}
+
+bool WEB::stop_https()
+{
+    bool ret = false;
+    if (https_server_)
+    {
+        cyw43_arch_lwip_begin();
+        altcp_arg(https_server_, nullptr);
+        altcp_accept(https_server_, nullptr);
+        altcp_close(https_server_);
+        cyw43_arch_lwip_end();
+        https_server_ = nullptr;
+        ret = true;
+    }
+    return ret;
 }
 
 bool WEB::connect_to_wifi(const std::string &hostname, const std::string &ssid, const std::string &password)
