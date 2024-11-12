@@ -108,6 +108,7 @@ bool WEB::start_http()
         altcp_arg(http_server_, this);
         altcp_accept(http_server_, tcp_server_accept);
         cyw43_arch_lwip_end();
+        log_->print("Listening on HTTP port %d\n", port);
     }
     return true;
 }
@@ -115,7 +116,7 @@ bool WEB::start_http()
 bool WEB::start_https()
 {
 #ifdef USE_HTTPS
-    if (!https_server_)
+    if (!https_server_ && tls_callback_)
     {
         cyw43_arch_lwip_begin();
         u16_t port = LWIP_IANA_PORT_HTTPS;
@@ -129,6 +130,7 @@ bool WEB::start_https()
         if (!conf)
         {
             log_->print("TLS configuration not loaded\n");
+            printf("Cert[%d/%d] :\n%s\n", cert.length(), strlen(cert.c_str()), cert.c_str());
             cyw43_arch_lwip_end();
             return false;
         }
@@ -160,8 +162,9 @@ bool WEB::start_https()
         altcp_arg(https_server_, this);
         altcp_accept(https_server_, tcp_server_accept);
         cyw43_arch_lwip_end();
+        log_->print("Listening on HTTPS port %d\n", port);
     }
-    return true;
+    return tls_callback_ != nullptr;
 #else
     return false;
 #endif
@@ -302,6 +305,13 @@ err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
         return ERR_VAL;
     }
     CLIENT *client = web->addClient(client_pcb);
+#if SNTP_SERVER_DNS
+    time_t now;
+    time(&now);
+    char timbuf[64];
+    strftime(timbuf, sizeof(timbuf), "%c", localtime(&now));
+    web->log_->print_debug(1, "%s ", timbuf);
+#endif
     web->log_->print_debug(1, "Client connected %p (handle %d) (%d clients)\n", client_pcb, client->handle(), web->clientPCB_.size());
     if (web->log_->isDebug(3))
     {
