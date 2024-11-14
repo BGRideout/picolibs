@@ -9,6 +9,8 @@
 #include "lwip/apps/mdns.h"
 #include "lwip/apps/sntp.h"
 #include "lwip/netif.h"
+#include "lwip/ip.h"
+#include "lwip/tcp.h"
 #include "lwip/prot/iana.h"
 #include "mbedtls/sha1.h"
 #include "mbedtls/base64.h"
@@ -25,6 +27,23 @@ WEB *WEB::singleton_ = nullptr;
 #ifndef WS_CLOSE_WAIT
 #define WS_CLOSE_WAIT    2      // Time to wait for response to websocket close (minutes)
 #endif
+
+//  HACK!!!
+//  Set the SO_REUSEADDR option to allow stop/start of listen sockets
+//  Should be replaced if altcp revised or supports this option
+void set_reuseaddr(struct altcp_pcb *conn)
+{
+    if (conn && conn->inner_conn)
+    {
+        if (conn->inner_conn->state)
+        {
+            struct tcp_pcb *pcb = (struct tcp_pcb *)conn->inner_conn->state;
+            ip_set_option(pcb, SOF_REUSEADDR);
+        }
+    }
+}
+
+
 
 WEB::WEB() : http_server_(nullptr), https_server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
@@ -85,6 +104,7 @@ bool WEB::start_http()
         altcp_allocator_t alloc = {altcp_tcp_alloc, conf};
         struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
 
+        set_reuseaddr(pcb);
         err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
         if (err)
         {
@@ -139,6 +159,7 @@ bool WEB::start_https()
         altcp_allocator_t alloc = {altcp_tls_alloc, conf};
         struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
 
+        set_reuseaddr(pcb);
         err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
         if (err)
         {
@@ -304,6 +325,7 @@ err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
         WEB::get()->log_->print("Failure in accept %d\n", err);
         return ERR_VAL;
     }
+    set_reuseaddr(client_pcb);
     CLIENT *client = web->addClient(client_pcb);
 #if SNTP_SERVER_DNS
     time_t now;
