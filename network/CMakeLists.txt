@@ -1,15 +1,37 @@
-#               *****  PICO Utility Library  *****
+#               *****  PICO Webserver Library  *****
 
-add_library(bgr_network INTERFACE)
+cmake_minimum_required(VERSION 3.13)
 
-target_sources(bgr_network INTERFACE
+set (USE-HTTPS ${USE-HTTPS})
+if (DEFINED USE-HTTPS)
+
+add_library(bgr_webserver INTERFACE)
+
+if (${USE-HTTPS} STREQUAL "true")
+	message("Building https version")
+	target_compile_definitions(bgr_webserver INTERFACE USE_HTTPS)
+else()
+	message("Building http version")
+endif()
+
+target_sources(bgr_webserver INTERFACE
     dhcpserver.c
     httprequest.cpp
     web.cpp
     web_set_time.c
     ws.cpp)
 
-target_include_directories(bgr_network INTERFACE
+target_link_libraries(bgr_webserver INTERFACE
+    bgr_util
+    pico_mbedtls
+    pico_lwip_mdns
+    pico_lwip_sntp)
+
+if (${USE-HTTPS} STREQUAL "true")
+    target_link_libraries(bgr_webserver INTERFACE pico_lwip_mbedtls)
+endif()
+    
+target_include_directories(bgr_webserver INTERFACE
    ${CMAKE_CURRENT_LIST_DIR})
 
 #[[         *****  web_files  *****
@@ -51,5 +73,15 @@ function(web_files)
 	    VERBATIM)
 
     add_dependencies(${PROJECT_NAME} ${WEB_FILES_TARGET})
-    
+
+    add_library(bgr_web_files INTERFACE)
+
+    target_sources(bgr_web_files INTERFACE  ${WEB_FILES_OUTPUT})
+
+    target_link_libraries(bgr_webserver INTERFACE bgr_web_files)
+
 endfunction()
+
+else()
+    message("USE-HTTPS not defined. Not including webserver.")
+endif()
