@@ -22,6 +22,7 @@ protected:
     static uint16_t         nled_;          // Number of LED's defined
     static alarm_pool_t     *pool_;         // Alarm pool
     static int64_t timer_cb(alarm_id_t id, void *user_data);
+    bool start();
     int64_t set_next();
 
     void                    *user_data_;    // User callback data
