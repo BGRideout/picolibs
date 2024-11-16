@@ -167,6 +167,11 @@ private:
     int             wifi_state_;            // WiFi state
     ip_addr_t       wifi_addr_;             // WiFi IP address
 
+    struct altcp_tls_config *tls_conf_;     // TLS configuration
+
+    uint32_t        reconnect_time_;        // Time until retry of connection
+    const uint32_t  reconnect_interval_ = 300000 / 50; // Timer intervals for retry
+
     void check_wifi();
 
     struct ScanRqst
@@ -208,7 +213,7 @@ private:
     void (*notice_callback_)(int state, void *user_data);
     void *notice_user_data_;
     void send_notice(int state) {if (notice_callback_) notice_callback_(state, notice_user_data_);}
-    void (*tls_callback_)(WEB *web, std::string &cert, std::string &pkey, std::string &pwd);
+    bool (*tls_callback_)(WEB *web, std::string &cert, std::string &pkey, std::string &pwd);
 
 public:
     /**
@@ -381,8 +386,10 @@ public:
      *              -cert   String to receive X.509 certificate
      *              -pkey   String to receive private key
      *              -pkpass String to receive private key passphrase
+     * 
+     *          Returns true if certificate and keys loaded
      */
-    void set_tls_callback(void(*cb)(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass))
+    void set_tls_callback(bool(*cb)(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass))
                         {tls_callback_ = cb;}
 
     /**

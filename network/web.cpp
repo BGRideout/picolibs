@@ -45,7 +45,8 @@ void set_reuseaddr(struct altcp_pcb *conn)
 
 
 
-WEB::WEB() : http_server_(nullptr), https_server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
+WEB::WEB() : http_server_(nullptr), https_server_(nullptr),
+             wifi_state_(CYW43_LINK_DOWN), tls_conf_(nullptr), reconnect_time_(0),
              ap_active_(0), ap_requested_(0), mdns_active_(false),
              http_callback_(nullptr), http_user_data_(nullptr),
              message_callback_(nullptr), message_user_data_(nullptr),
@@ -66,11 +67,11 @@ WEB *WEB::get()
 
 bool WEB::init()
 {
+    log_->print("Initializing webserver\n");
     cyw43_arch_enable_sta_mode();
     cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
     uint32_t pm;
     cyw43_wifi_get_pm(&cyw43_state, &pm);
-    log_->print("Power mode: %x\n", pm);
 
     mdns_resp_init();
 
@@ -135,6 +136,7 @@ bool WEB::start_http()
 
 bool WEB::start_https()
 {
+    bool ret = false;
 #ifdef USE_HTTPS
     if (!https_server_ && tls_callback_)
     {
@@ -143,52 +145,54 @@ bool WEB::start_https()
         std::string cert;
         std::string pkey;
         std::string pkpass;
-        tls_callback_(this, cert, pkey, pkpass);
-        struct altcp_tls_config * conf = altcp_tls_create_config_server_privkey_cert((const u8_t *)pkey.c_str(), pkey.length() + 1,
-                                                                                    (const u8_t *)pkpass.c_str(), pkpass.length() + 1,
-                                                                                    (const u8_t *)cert.c_str(), cert.length() + 1);
-        if (!conf)
+        if (tls_callback_(this, cert, pkey, pkpass))
         {
-            log_->print("TLS configuration not loaded\n");
-            printf("Cert[%d/%d] :\n%s\n", cert.length(), strlen(cert.c_str()), cert.c_str());
-            cyw43_arch_lwip_end();
-            return false;
-        }
-        mbedtls_debug_set_threshold(1);
-
-        altcp_allocator_t alloc = {altcp_tls_alloc, conf};
-        struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
-
-        set_reuseaddr(pcb);
-        err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
-        if (err)
-        {
-            log_->print("failed to bind to port %u: %d\n", port, err);
-            cyw43_arch_lwip_end();
-            return false;
-        }
-
-        https_server_ = altcp_listen_with_backlog(pcb, 1);
-        if (!https_server_)
-        {
-            log_->print("failed to listen to HTTPS port\n");
-            if (pcb)
+            ret = true;
+            tls_conf_ = altcp_tls_create_config_server_privkey_cert((const u8_t *)pkey.c_str(), pkey.length() + 1,
+                                                                    (const u8_t *)pkpass.c_str(), pkpass.length() + 1,
+                                                                    (const u8_t *)cert.c_str(), cert.length() + 1);
+            if (!tls_conf_)
             {
-                altcp_close(pcb);
+                log_->print("TLS configuration not loaded\n");
+                cyw43_arch_lwip_end();
+                return false;
             }
-            cyw43_arch_lwip_end();
-            return false;
-        }
+            mbedtls_debug_set_threshold(1);
 
-        altcp_arg(https_server_, this);
-        altcp_accept(https_server_, tcp_server_accept);
-        cyw43_arch_lwip_end();
-        log_->print("Listening on HTTPS port %d\n", port);
+            altcp_allocator_t alloc = {altcp_tls_alloc, tls_conf_};
+            struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
+
+            set_reuseaddr(pcb);
+            err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
+            if (err)
+            {
+                log_->print("failed to bind to port %u: %d\n", port, err);
+                altcp_close(pcb);
+                altcp_tls_free_config(tls_conf_);
+                tls_conf_ = nullptr;
+                cyw43_arch_lwip_end();
+                return false;
+            }
+
+            https_server_ = altcp_listen_with_backlog(pcb, 1);
+            if (!https_server_)
+            {
+                log_->print("failed to listen to HTTPS port\n");
+                altcp_close(pcb);
+                altcp_tls_free_config(tls_conf_);
+                tls_conf_ = nullptr;
+                cyw43_arch_lwip_end();
+                return false;
+            }
+
+            altcp_arg(https_server_, this);
+            altcp_accept(https_server_, tcp_server_accept);
+            cyw43_arch_lwip_end();
+            log_->print("Listening on HTTPS port %d\n", port);
+        }
     }
-    return tls_callback_ != nullptr;
-#else
-    return false;
 #endif
+    return ret;
 }
 
 bool WEB::stop_http()
@@ -216,6 +220,11 @@ bool WEB::stop_https()
         altcp_arg(https_server_, nullptr);
         altcp_accept(https_server_, nullptr);
         altcp_close(https_server_);
+        if (tls_conf_)
+        {
+            //altcp_tls_free_config(tls_conf_);
+            tls_conf_ = nullptr;
+        }
         cyw43_arch_lwip_end();
         https_server_ = nullptr;
         ret = true;
@@ -812,6 +821,7 @@ void WEB::check_wifi()
             mdns_active_ = true;
             log_->print("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
             send_notice(STA_CONNECTED);
+            reconnect_time_ = 0;
             break;
 
         case CYW43_LINK_DOWN:
@@ -822,6 +832,7 @@ void WEB::check_wifi()
                                                        (wifi_state_ == CYW43_LINK_FAIL) ? "link failed" :
                                                        "No network found");
             send_notice(STA_DISCONNECTED);
+            reconnect_time_ = reconnect_interval_;
             break;
 
         case CYW43_LINK_BADAUTH:
@@ -829,6 +840,26 @@ void WEB::check_wifi()
             log_->print("WiFi authentication failed\n");
             send_notice(STA_DISCONNECTED);
             break;
+        }
+    }
+
+    //  Checck for reconnection attempt needed
+    if (reconnect_time_ > 0)
+    {
+        reconnect_time_ -= 1;
+        if (reconnect_time_ == 0)
+        {
+            switch (wifi_state_)
+            {
+            case CYW43_LINK_DOWN:
+            case CYW43_LINK_FAIL:
+            case CYW43_LINK_NONET:
+                if (wifi_ssid_.length() > 0)
+                {
+                    bool ret = connect_to_wifi(hostname_, wifi_ssid_, wifi_pwd_);
+                    log_->print("Reconnect WiFi\n");
+                }
+            }
         }
     }
 
