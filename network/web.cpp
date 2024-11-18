@@ -68,6 +68,7 @@ WEB *WEB::get()
 bool WEB::init()
 {
     log_->print("Initializing webserver\n");
+    cyw43_arch_lwip_begin();
     cyw43_arch_enable_sta_mode();
     cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
     uint32_t pm;
@@ -80,6 +81,8 @@ bool WEB::init()
     sntp_setservername(0, "pool.ntp.org");
     sntp_init();
 #endif
+
+    cyw43_arch_lwip_end();
 
     bool listening = false;
 #ifdef USE_HTTPS
@@ -235,8 +238,12 @@ bool WEB::stop_https()
 bool WEB::connect_to_wifi(const std::string &hostname, const std::string &ssid, const std::string &password)
 {
     bool ret = false;
+    cyw43_arch_lwip_begin();
     hostname_ = hostname;
-    netif_set_hostname(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
+    if (!hostname.empty())
+    {
+        netif_set_hostname(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
+    }
 
     wifi_ssid_ = ssid;
     wifi_pwd_ = password;
@@ -245,6 +252,7 @@ bool WEB::connect_to_wifi(const std::string &hostname, const std::string &ssid, 
         log_->print("Host '%s' connecting to Wi-Fi on SSID '%s' ...\n", hostname_.c_str(), wifi_ssid_.c_str());
         ret = cyw43_arch_wifi_connect_async(wifi_ssid_.c_str(), wifi_pwd_.c_str(), CYW43_AUTH_WPA2_AES_PSK) == 0;
     }
+    cyw43_arch_lwip_end();
     return ret;
 }
 
@@ -305,8 +313,10 @@ bool WEB::update_wifi(const std::string &hostname, const std::string &ssid, cons
     bool ret = true;
     if (hostname != hostname_ || ssid != wifi_ssid_ || password != wifi_pwd_)
     {
+        cyw43_arch_lwip_begin();
         cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
         ret = connect_to_wifi(hostname, ssid, password);
+        cyw43_arch_lwip_end();
     }
     else
     {
@@ -725,13 +735,15 @@ void WEB::send_websocket(struct altcp_pcb *client_pcb, enum WebSocketOpCode opc,
 
 void WEB::broadcast_websocket(const std::string &txt)
 {
-    for (auto it = clientHndl_.begin(); it != clientHndl_.end(); ++it)
+    cyw43_arch_lwip_begin();
+    for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
     {
         if (it->second->isWebSocket())
         {
             send_websocket(it->second->pcb(), WEBSOCKET_OPCODE_TEXT, txt);
         }
     }
+    cyw43_arch_lwip_end();
 }
 
 void WEB::mark_for_close(struct altcp_pcb *client_pcb)
@@ -784,7 +796,9 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
         {
             log_->print_debug(1, "Closing %s %p (%d)\n", (client->isWebSocket() ? "ws" : "http"), client_pcb, client->handle());
             client->setClosed();
+            cyw43_arch_lwip_begin();
             altcp_close(client_pcb);
+            cyw43_arch_lwip_end();
             deleteClient(client_pcb);
         }
     }
@@ -792,7 +806,9 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
     {
         if (!isClosed)
         {
+            cyw43_arch_lwip_begin();
             err_t csts = altcp_close(client_pcb);
+            cyw43_arch_lwip_end();
             log_->print_debug(1, "Close status %p  = %d\n", client_pcb, csts);
         }   
     }
@@ -801,7 +817,9 @@ void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
 void WEB::check_wifi()
 {
     netif *ni = wifi_netif(CYW43_ITF_STA);
+    cyw43_arch_lwip_begin();
     int sts = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    cyw43_arch_lwip_end();
     if (sts != wifi_state_ || !ip_addr_eq(&ni->ip_addr, &wifi_addr_))
     {
         wifi_state_ = sts;
@@ -817,12 +835,14 @@ void WEB::check_wifi()
 
         case CYW43_LINK_UP:
             //  Connected
+            cyw43_arch_lwip_begin();
             if (mdns_active_)
             {
                 mdns_resp_remove_netif(ni);
             }
             mdns_resp_add_netif(ni, hostname_.c_str());
             mdns_resp_announce(ni);
+            cyw43_arch_lwip_end();
             mdns_active_ = true;
             log_->print("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
             send_notice(STA_CONNECTED);
@@ -884,12 +904,14 @@ void WEB::check_wifi()
 
 void WEB::scan_wifi(ClientHandle client, WiFiScan_cb callback, void *user_data)
 {
+    cyw43_arch_lwip_begin();
     if (!cyw43_wifi_scan_active(&cyw43_state))
     {
         cyw43_wifi_scan_options_t opts = {0};
         int sts = cyw43_wifi_scan(&cyw43_state, &opts, this, scan_cb);
         scans_.clear();
     }
+    cyw43_arch_lwip_end();
     ScanRqst rqst = {.client = client, .cb = callback, .user_data = user_data };
     scans_.push_back(rqst);
 }
@@ -907,18 +929,24 @@ int WEB::scan_cb(void *arg, const cyw43_ev_scan_result_t *rslt)
 
 void WEB::check_scan_finished()
 {
-    if (scans_.size() > 0 && !cyw43_wifi_scan_active(&cyw43_state))
+    if (scans_.size() > 0)
     {
-        for (auto it = scans_.cbegin(); it != scans_.cend(); ++it)
+        cyw43_arch_lwip_begin();
+        bool active = cyw43_wifi_scan_active(&cyw43_state);
+        cyw43_arch_lwip_end();
+        if (!active)
         {
-            if (it->cb != nullptr)
+            for (auto it = scans_.cbegin(); it != scans_.cend(); ++it)
             {
-                it->cb(this, it->client, ssids_, it->user_data);
+                if (it->cb != nullptr)
+                {
+                    it->cb(this, it->client, ssids_, it->user_data);
+                }
             }
-        }
 
-        ssids_.clear();
-        scans_.clear();
+            ssids_.clear();
+            scans_.clear();
+        }
     }
 }
 
@@ -934,6 +962,7 @@ void WEB::start_ap()
     if (ap_active_ == 0)
     {
         log_->print("Starting AP %s\n", ap_name_.c_str());
+        cyw43_arch_lwip_begin();
         cyw43_arch_enable_ap_mode(ap_name_.c_str(), "12345678", CYW43_AUTH_WPA2_AES_PSK);
         netif_set_hostname(wifi_netif(CYW43_ITF_AP), ap_name_.c_str());
     
@@ -943,6 +972,7 @@ void WEB::start_ap()
         IP4_ADDR(ip_2_ip4(&addr), 192, 168, 4, 1);
         IP4_ADDR(ip_2_ip4(&mask), 255, 255, 255, 0);
         dhcp_server_init(&dhcp_, &addr, &mask);
+        cyw43_arch_lwip_end();
     }
     else
     {
@@ -955,8 +985,10 @@ void WEB::start_ap()
 
 void WEB::stop_ap()
 {
+    cyw43_arch_lwip_begin();
     dhcp_server_deinit(&dhcp_);
     cyw43_arch_disable_ap_mode();
+    cyw43_arch_lwip_end();
     log_->print("AP deactivated\n");
     send_notice(AP_INACTIVE);
 }
