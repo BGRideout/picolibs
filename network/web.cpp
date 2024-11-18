@@ -187,9 +187,9 @@ bool WEB::start_https()
 
             altcp_arg(https_server_, this);
             altcp_accept(https_server_, tcp_server_accept);
-            cyw43_arch_lwip_end();
             log_->print("Listening on HTTPS port %d\n", port);
         }
+        cyw43_arch_lwip_end();
     }
 #endif
     return ret;
