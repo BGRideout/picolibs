@@ -234,12 +234,17 @@ bool WEB::stop_https()
 
 bool WEB::connect_to_wifi(const std::string &hostname, const std::string &ssid, const std::string &password)
 {
+    bool ret = false;
     hostname_ = hostname;
+    netif_set_hostname(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
+
     wifi_ssid_ = ssid;
     wifi_pwd_ = password;
-    log_->print("Host '%s' connecting to Wi-Fi on SSID '%s' ...\n", hostname_.c_str(), wifi_ssid_.c_str());
-    netif_set_hostname(wifi_netif(CYW43_ITF_STA), hostname_.c_str());
-    bool ret = cyw43_arch_wifi_connect_async(wifi_ssid_.c_str(), wifi_pwd_.c_str(), CYW43_AUTH_WPA2_AES_PSK) == 0;
+    if (!ssid.empty())
+    {
+        log_->print("Host '%s' connecting to Wi-Fi on SSID '%s' ...\n", hostname_.c_str(), wifi_ssid_.c_str());
+        ret = cyw43_arch_wifi_connect_async(wifi_ssid_.c_str(), wifi_pwd_.c_str(), CYW43_AUTH_WPA2_AES_PSK) == 0;
+    }
     return ret;
 }
 
