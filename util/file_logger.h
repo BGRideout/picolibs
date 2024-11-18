@@ -48,6 +48,12 @@ public:
     int print_debug(int level, const char *format, ...) override;
 
     /**
+     * @brief   Print method with same function as printf/vprintf. Always print timestamp and no file trim.
+     */
+    int print_error(const char *format, ...);
+    int print_error(const char *format, va_list ap);
+
+    /**
      * @brief   Trim file to trimmed_lines line count
      */
     bool trim_file();
@@ -126,6 +132,11 @@ public:
      * @brief   Call to initialize timestamps
      */
     void initialize_timestamps();
+
+    /**
+     * @brief   Print timestamp
+     */
+    void print_timestamp();
 };
 
 #endif

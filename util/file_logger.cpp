@@ -32,6 +32,11 @@ int FileLogger::print(const char *format, ...)
     int ret = vprint(format, ap);
 
     va_end(ap);
+
+    if (line_count_ > max_lines_)
+    {
+        trim_file();
+    }
     return ret;
 }
 
@@ -47,10 +52,31 @@ int FileLogger::print_debug(int level, const char *format, ...)
         ret = vprint(format, ap);
 
         va_end(ap);
+
+        if (line_count_ > max_lines_)
+        {
+            trim_file();
+        }
     }
     return ret;
 }
 
+int FileLogger::print_error(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+
+    int ret = vprint(format, ap);
+
+    va_end(ap);
+    return ret;
+}
+
+int FileLogger::print_error(const char *format, va_list ap)
+{
+    int ret = vprint(format, ap);
+    return ret;
+}
 
 int FileLogger::vprint(const char *format, va_list ap)
 {
@@ -86,12 +112,25 @@ int FileLogger::vprint(const char *format, va_list ap)
         fclose(f);
     }
 
-    if (line_count_ > max_lines_)
-    {
-        trim_file();
-    }
-
     return ret;
+}
+
+void FileLogger::print_timestamp()
+{
+    if (last_timestamp_ != 0)
+    {
+        time_t now;
+        time(&now);
+        printf("%s\n", timestamp(&now));
+        FILE *f = fopen(filename_, "a+");
+        if (f)
+        {
+            fprintf(f, "%s\n", timestamp(&now));
+            ++line_count_;
+            last_timestamp_ = now;
+            fclose(f);
+        }
+    }
 }
 
 bool FileLogger::trim_file()
