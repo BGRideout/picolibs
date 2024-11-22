@@ -2,8 +2,11 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-set (USE-HTTPS ${USE-HTTPS})
-if (DEFINED USE-HTTPS)
+if (DEFINED ENV{USE-HTTPS})
+    set (USE-HTTPS ${USE-HTTPS})
+else()
+    set (USE-HTTPS "true")
+endif()
 
 add_library(bgr_webserver INTERFACE)
 
@@ -82,6 +85,3 @@ function(web_files)
 
 endfunction()
 
-else()
-    message("USE-HTTPS not defined. Not including webserver.")
-endif()
