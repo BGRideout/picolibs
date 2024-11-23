@@ -1,10 +1,11 @@
 //                  *****  JSONString Class  *****
 
 /**
- *  @details
- * This class is used for strings that can rfrence the document refereenced by the tiny-json
+ * @class   JSONString
+ * 
+ * This class is used for strings that can reference the document referenced by the tiny-json
  * library.  If assigned from the tiny-json json_t property, the pointer references the data
- * buffer containing th JSON data.  If assigned from an eplicit string, the string replaces
+ * buffer containing the JSON data.  If assigned from an explicit string, the string replaces
  * the original JSON buffer string if it fits or is allocated on the heap.
  */
 
@@ -25,11 +26,21 @@ private:
     static char     blank_[];           // Blank string
 
 public:
+    /**
+     * @brief   Constructors
+     */
     JSONString() : string_(nullptr), buflen_(0) {}
     JSONString(const char *string);
     JSONString(const JSONString &other);
+
+    /**
+     * @brief   Destructor
+     */
     ~JSONString();
 
+    /**
+     * @brief   Assignment operator
+     */
     JSONString &operator = (const JSONString &other);
 
     /**

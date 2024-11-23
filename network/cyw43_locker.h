@@ -24,7 +24,7 @@ public:
      * 
      * @details
      *  Locks the cyw43 access until object destroyed normally
-     *  when th object goes out of scope
+     *  when the object goes out of scope
      */
     inline ~CYW43Locker() {unlock();}
 

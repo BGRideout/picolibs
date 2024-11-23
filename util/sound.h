@@ -35,20 +35,20 @@ private:
 
 public:
     /**
-     * @brief   Get the Bell singleton
+     * @brief   Get the Sound singleton
      * 
-     * @return  Pointer to Bell singleton
+     * @return  Pointer to Sound singleton
      */
     static Sound *get() { if (!singleton_) { singleton_ = new Sound(); } return singleton_; }
     /**
-     * @brief   Start Bell singleton
+     * @brief   Start Sound singleton
      * 
      * @param   gpio        GPIO for sound output
      */
     void start(uint32_t gpio);
 
     /**
-     * @brief   Stop Bell singleton
+     * @brief   Stop Sound singleton
      */
     void stop();
 

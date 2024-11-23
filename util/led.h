@@ -32,6 +32,13 @@ public:
      * @param   state   Initial state of LED (true = on)
      */
     LED(uint32_t gpio, bool state=true);
+
+    /**
+     * @brief   LED class constructor
+     * 
+     * @param   led     String "LED" indicates onboard LED or numeric string for GPIO
+     * @param   state   Initial state of LED (true = on)
+     */
     LED(const char *led="LED", bool state=true);
 
     /**

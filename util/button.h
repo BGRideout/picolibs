@@ -13,21 +13,29 @@
 class Button
 {
 public:
+    /**
+     * @enum    ButtonAction
+     */
     enum ButtonAction
     {
-        No_Action,
-        Button_Down,
-        Button_Up,
-        Button_Clicked,
-        Button_DoubleClicked,
-        Button_Held
+        No_Action,              /**< No action               */
+        Button_Down,            /**< Button down             */
+        Button_Up,              /**< Button up               */
+        Button_Clicked,         /**< Button clicked          */
+        Button_DoubleClicked,   /**< Button double clicked   */
+        Button_Held             /**< Button held down        */
     };
 
+    /**
+     * @struct  ButtonEvent
+     * 
+     * @brief   Structure containing button event data (both callback and event queue)
+     */
     struct ButtonEvent
     {
-        uint64_t        time;
-        uint32_t        id;
-        ButtonAction    action;
+        uint64_t        time;           /**< Time of button event    */
+        uint32_t        id;             /**< Button ID               */
+        ButtonAction    action;         /**< Action performed        */
     };
 
     typedef void (*button_cb_t)(struct ButtonEvent &ev, void *user_data);

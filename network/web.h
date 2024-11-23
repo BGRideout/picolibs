@@ -19,8 +19,49 @@ extern "C"
 #include "ws.h"
 #include "logger.h"
 
+/**
+ * @class   WEB
+ * 
+ * This singleton class implements a web server to run on a pico-w board.
+ * 
+ * It will support both https and http connections unless the CMake
+ * variable -DUSE-HTTPS=false is specified. Connections by https will
+ * be enabled if the TLS callback provides valid X.509 public and 
+ * private keys and key decryption password. If no TLS callback or
+ * the certificates are not provided or not valid, http is enabled.
+ * Both protocols can be managed with the start_http(s) and stop_http(s)
+ * method calls.
+ * 
+ * The setup sequence is similar to:
+ * @code
+ *    WEB *web = WEB::get();
+ *    web->setLogger(log_);
+ *    web->set_tls_callback(tls_callback);
+ *    web->set_notice_callback(state_callback, this);
+ *    web->set_http_callback(http_request, this);
+ *    web->set_message_callback(web_message, this);
+ *    web->init();
+ *    web->connect_to_wifi(cfg->hostname(), cfg->ssid(), cfg->password());
+ * @endcode
+ * 
+ * Processing is the performed by the callback functions and using the
+ * methods to send responses.
+ * 
+ * The class also supports an Access Point (AP) mode that can be enabled
+ * to allow direct connections at IP address 192.168.4.1 typically to be
+ * used for initial setup of the device such as entering the SSID and
+ * password for the WiFI connection
+ */
 class WEB;
 
+/**
+ * @typedef ClientHandle
+ * 
+ * @brief   Handle to connected Web server client
+ * 
+ * An opaque value referencig a connection to the web server.
+ * A value of zero indicates an invalid handle.
+ */
 typedef uint32_t   ClientHandle;
 
 /**
@@ -346,7 +387,7 @@ public:
                              { message_callback_ = cb; message_user_data_ = user_data; }
 
     /**
-     * @brief   Send a tet message to all connected websockets
+     * @brief   Send a text message to all connected websockets
      * 
      * @param   txt         Message to be sent
      */
@@ -434,7 +475,7 @@ public:
     /**
      * @brief   Test if access point is active
      */
-    bool ap_active() const { return ap_active_ > 0; }
+    bool is_ap_active() const { return ap_active_ > 0; }
 
     /**
      * @brief   Scan for available WiFI access point names (SSID's)
