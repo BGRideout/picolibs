@@ -32,6 +32,9 @@ extern "C"
  * Both protocols can be managed with the start_http(s) and stop_http(s)
  * method calls.
  * 
+ * Websocket connections are supported for both ws and wss. A JavaScript
+ * file (websocket.js) is provided to support websocket data exchange.
+ * 
  * The setup sequence is similar to:
  * @code
  *    WEB *web = WEB::get();

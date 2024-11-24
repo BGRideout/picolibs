@@ -1,3 +1,34 @@
+/**
+ * \file websocket.js
+ * \verbinclude websocket.js
+ * 
+ * This package provides functions to communicate with a webserver
+ * using websockets. It is included by an HTML document along with
+ * the Javascript file for the document's application logic. That
+ * script then enables websocket communication usng a sequence:
+ * 
+ * \code
+document.addEventListener('DOMContentLoaded', function()
+{
+  document.addEventListener('ws_state', ws_state_change);
+  document.addEventListener('ws_message', process_ws_message);
+  ...
+  openWS();
+});
+ * \endcode
+ *
+ * The **ws_state** event is called when the open/closed state
+ * of the websocket changes. The current state can be obtained
+ * by inspecting the property *evt.detail.obj['open']* of the
+ * event (evt).
+ * 
+ * The **ws_message** event is called when a message is received
+ * on the websocket. The message text is available from the
+ * property *evt.detail.message* of the evet (evt).
+ */
+
+/// \cond DO_NOT_DOCUMENT
+
 // Websocket variables
 var ws = undefined;             // WebSocket object
 var timer_ = undefined;         // Reconnect timer
@@ -6,6 +37,14 @@ var opened_ = false;            // Connection opened flag
 var closed_ = true;             // Websocket closed flag
 var suspended_ = false;         // I/O suspended flag
 
+/// \endcond
+
+/**
+ * @brief Open connection to websocket
+ * 
+ * Once opened, the connection will automtically continue
+ * to be reopened in case of errors or disconnects.
+ */
 function openWS()
 {
     if ('WebSocket' in window)
@@ -95,6 +134,50 @@ function openWS()
     }
 }
 
+/**
+ * @brief   Test if websocket is open
+ * @returns true if open
+ */
+function isWSOpen()
+{
+    return opened_;
+}
+
+/**
+ * @brief   Close websocket
+ * 
+ * Closes the websocket and stops periodic reconnection
+ */
+function closeWS()
+{
+    closed_ = true;
+    if (typeof ws === 'object')
+    {
+        console.log('Closing websocket');
+        ws.close();
+    }
+    setWSOpened(false);
+}
+
+/**
+ * @brief   Send a text message to the websocket
+ * @param   msg Text string to be sent
+ */
+function sendToWS(msg)
+{
+    if (typeof ws === 'object')
+    {
+        ws.send(msg);
+        //console.log('Sent: ' + msg);
+    }
+    else
+    {
+        alert('No connection to remote! - Refresh browser and try again.');
+    }
+}
+
+/// \cond DO_NOT_DOCUMENT
+
 function checkOpenState(retries = 0)
 {
     clearTimeout(conchk_);
@@ -125,22 +208,6 @@ function setWSOpened(state)
   }
 }
 
-function isWSOpen()
-{
-    return opened_;
-}
-
-function closeWS()
-{
-    closed_ = true;
-    if (typeof ws === 'object')
-    {
-        console.log('Closing websocket');
-        ws.close();
-    }
-    setWSOpened(false);
-}
-
 function retryConnection()
 {
     if (!suspended_ && !closed_)
@@ -152,15 +219,4 @@ function retryConnection()
      }
 }
 
-function sendToWS(msg)
-{
-    if (typeof ws === 'object')
-    {
-        ws.send(msg);
-        //console.log('Sent: ' + msg);
-    }
-    else
-    {
-        alert('No connection to remote! - Refresh browser and try again.');
-    }
-}
+/// \endcond

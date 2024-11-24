@@ -9,6 +9,8 @@
 #define WEBSOCKET_FAIL                             ( -1 )
 
 /**
+ * The websocket message buffer has the format:
+ * 
  *\code
  *    0                   1                   2                   3
  *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -61,9 +63,27 @@ enum WebSocketOpCode {
     WEBSOCKET_OPCODE_PING = 0x9,
     WEBSOCKET_OPCODE_PONG = 0xA
 };
+
 class WS {
     public:
+        /**
+         * @brief   Build a websocket message packet
+         * 
+         * @param   opcode  Websocket op-code
+         * @param   payload Message payload
+         * @param   msg     String to receive packet
+         * @param   mask    Message to be masked if true
+         * 
+         * @return  Size of message packet
+         */
         static uint32_t BuildPacket(enum WebSocketOpCode opcode, const std::string &payload, std::string &msg, bool mask);
+
+        /**
+         * @brief   Parse a websocket message packet
+         * 
+         * @param   header  Pointer to structure to receive packet data
+         * @param   packet  String containing websocket message packet
+         */
         static int ParsePacket(WebsocketPacketHeader_t *header, std::string &packet);
 };
 

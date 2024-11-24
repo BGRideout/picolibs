@@ -65,7 +65,7 @@ Used when persistent storage on the microSD card is used.  Class FileLogger requ
 this library (flash-filesystem) to be used and for the application to initialize the
 filesystem on startup with code like:
 
-'''
+```
 //  File system definition
 #define ROOT_OFFSET 0x110000
 #if ENABLE_BLE
@@ -82,7 +82,7 @@ filesystem on startup with code like:
     ffs_pico_createcfg (&cfg, ROOT_OFFSET, ROOT_SIZE);
     pfs = pfs_ffs_create (&cfg);
     pfs_mount (pfs, "/");
-'''
+```
 
 #### License
 The software in the "littlefs" and "fatfs" folders comes from third parties and 
