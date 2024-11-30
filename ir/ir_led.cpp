@@ -38,7 +38,7 @@ IR_LED::~IR_LED()
     if(--nled_ == 0)
     {
         uint alarm_num = alarm_pool_hardware_alarm_num(pool_);
-        irq_set_priority(TIMER_IRQ_0 + alarm_num, PICO_DEFAULT_IRQ_PRIORITY);
+        irq_set_priority(TIMER_ALARM_IRQ_NUM(alarm_pool_get_default_timer(), alarm_num), PICO_DEFAULT_IRQ_PRIORITY);
         alarm_pool_destroy(pool_);
         pool_ = nullptr;
     }

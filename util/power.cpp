@@ -16,6 +16,7 @@
 
 void Power::enable()
 {
+    adc_init();
     //  Read voltage until stable
     float v0 = batteryVolts();
     for (int ii = 0; ii < 100; ii++)
