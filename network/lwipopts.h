@@ -9,18 +9,26 @@
 #define MEM_ALIGNMENT               4
 #define MEMP_NUM_TCP_SEG            64
 #define MEMP_NUM_ARP_QUEUE          10
-#define PBUF_POOL_SIZE              32
 #define LWIP_ARP                    1
 #define LWIP_ETHERNET               1
 #define LWIP_ICMP                   1
 #define LWIP_RAW                    1
 #define TCP_MSS                     1460
 #ifdef USE_HTTPS
+#if PICO_RP2350
+#define MEM_SIZE                    32768
+#define TCP_WND                     16384
+#define	MEMP_NUM_PBUF               32
+#define PBUF_POOL_SIZE              64
+#else
 #define MEM_SIZE                    16384
 #define TCP_WND                     16384
+#define PBUF_POOL_SIZE              32
+#endif
 #else
 #define MEM_SIZE                    8192
 #define TCP_WND                     (8 * TCP_MSS)
+#define PBUF_POOL_SIZE              32
 #endif
 #define TCP_SND_BUF                 (8 * TCP_MSS)
 #define TCP_SND_QUEUELEN            ((8 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
@@ -92,7 +100,11 @@
 #ifdef USE_HTTPS
 #define LWIP_ALTCP_TLS              1
 #define LWIP_ALTCP_TLS_MBEDTLS      1
+#if PICO_RP2350
+#define MEMP_NUM_TCP_PCB            24
+#else
 #define MEMP_NUM_TCP_PCB            8
+#endif
 #define ALTCP_MBEDTLS_DEBUG         LWIP_DBG_ON
 #define ALTCP_MBEDTLS_LIB_DEBUG     LWIP_DBG_ON
 #endif

@@ -214,7 +214,7 @@ private:
     struct altcp_tls_config *tls_conf_;     // TLS configuration
 
     uint32_t        reconnect_time_;        // Time until retry of connection
-    const uint32_t  reconnect_interval_ = 300000 / 50; // Timer intervals for retry
+    const uint32_t  reconnect_interval_ = 300000 / 500; // Timer intervals for retry (5 min)
 
     void check_wifi();
 
