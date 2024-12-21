@@ -20,6 +20,13 @@ bool JSONMap::loadFile(const char *filename)
         fclose(f);
         ret = load();
     }
+    else
+    {
+        data_ = new char[8];
+        strncpy(data_, "{}", 8);
+        load();
+        ret = false;
+    }
     return ret;
 }
 
