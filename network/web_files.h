@@ -1,6 +1,8 @@
 #ifndef WEB_FILES_H
 #define WEB_FILES_H
 
+#include "web.h"
+
 #include <string>
 #include <stdint.h>
 #include <map>
@@ -54,6 +56,18 @@ public:
      * @return  true if file name found
      */
     bool get_file(const std::string &name, const char * &data, uint16_t &datalen);
+
+    /**
+     * @brief	Send websocket.js file if requested
+     *
+     * @param   web         Pointer to WEB object
+     * @param   client      Handle of client connection
+     * @param	rqst        HTTP request
+     * @param   close       boolean initially set to true. Called function can
+     *                      set it to false to keep connection open after return
+     * @param	wspath	    String to set for websocket path (default /ws/)
+     */
+    bool send_websocket_js(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close, const std::string &wspath = std::string());
 };
 
 #endif

@@ -21,6 +21,7 @@ target_sources(bgr_webserver INTERFACE
     dhcpserver.c
     httprequest.cpp
     web.cpp
+    web_files_websocket.cpp
     web_set_time.c
     ws.cpp)
 
@@ -43,7 +44,7 @@ target_include_directories(bgr_webserver INTERFACE
 
 \details    Create the data portion for the WEB_FILES class
 
-\param      WEBSOCKET   If present, the websocket.js fie is included
+\param      WEBSOCKET   If present, the websocket.js file is included
 \param      DIR         Directory to receive generated file (default build/generated)
 \param      OUTPUT      Name of generated file (default web_files.cpp)
 \param      FILES       List of source files to be included in filesystem
@@ -79,7 +80,7 @@ function(web_files)
 
     add_library(bgr_web_files INTERFACE)
 
-    target_sources(bgr_web_files INTERFACE  ${WEB_FILES_OUTPUT})
+    target_sources(bgr_web_files INTERFACE ${WEB_FILES_OUTPUT})
 
     target_link_libraries(bgr_webserver INTERFACE bgr_web_files)
 
