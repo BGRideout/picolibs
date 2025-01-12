@@ -68,8 +68,8 @@
 #define IP_DEBUG                    LWIP_DBG_OFF
 #define IP_REASS_DEBUG              LWIP_DBG_OFF
 #define RAW_DEBUG                   LWIP_DBG_OFF
-#define MEM_DEBUG                   LWIP_DBG_OFF
-#define MEMP_DEBUG                  LWIP_DBG_OFF
+#define MEM_DEBUG                   LWIP_DBG_ON
+#define MEMP_DEBUG                  LWIP_DBG_ON
 #define SYS_DEBUG                   LWIP_DBG_OFF
 #define TCP_DEBUG                   LWIP_DBG_OFF
 #define TCP_INPUT_DEBUG             LWIP_DBG_OFF
@@ -102,6 +102,7 @@
 #define LWIP_ALTCP_TLS_MBEDTLS      1
 #if PICO_RP2350
 #define MEMP_NUM_TCP_PCB            24
+#define MEMP_NUM_RAW_PCB            8
 #else
 #define MEMP_NUM_TCP_PCB            8
 #endif
@@ -116,5 +117,19 @@
 
 //  For close/open of listen ports
 #define SO_REUSE                    1
+
+#ifdef APP_ERR_LOGGER
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+    void APP_ERR_LOGGER(const char *fmt, ...);
+#ifdef __cplusplus
+}
+#endif
+#define LWIP_PLATFORM_DIAG(x)       do {APP_ERR_LOGGER x;} while(0)
+#define LWIP_PLATFORM_ASSERT(x)     do {APP_ERR_LOGGER("Assertion \"%s\" failed at line %d in %s\n", \
+                                     x, __LINE__, __FILE__); fflush(NULL); abort();} while(0)
+#endif
 
 #endif /* __LWIPOPTS_H__ */
