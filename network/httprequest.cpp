@@ -44,6 +44,46 @@ bool HTTPRequest::parseRequest(std::string &rqst, bool parsePostData)
                 get_post();
             }
         }
+        else
+        {
+            std::size_t ll = body_offset_ + body_size_;
+            if (rqst.capacity() < ll)
+            {
+                rqst.reserve(ll);
+            }
+        }
+    }
+    else
+    {
+        std::size_t i1 = 0;
+        while (rqst.length() > 0 && i1 < rqst.length())
+        {
+            std::size_t i2 = rqst.find_first_of("GP", i1);
+            if (i2 != std::string::npos)
+            {
+                if ((rqst.length() > i2 + 4 && rqst.substr(i2, 4) == "GET ") ||
+                    (rqst.length() > i2 + 5 && rqst.substr(i2, 5) == "POST "))
+                {
+                    if (i2 > 0)
+                    {
+                        printf("Erased %d characters preceding GET/POST\n", i2);
+                        rqst.erase(0, i2);
+                        i1 = rqst.length();
+                    }
+                }
+                else if ((rqst.at(i2) == 'G' && rqst.length() > i2 + 4) ||
+                         (rqst.at(i2) == 'P' && rqst.length() > i2 + 5))
+                {
+                    printf("Erased %d characters up to %s\n", i2 + 1, rqst.substr(i2, 4).c_str());
+                    rqst.erase(0, i2 + 1);
+                }
+            }
+            else
+            {
+                printf("Cleared %d characters where no G or P present\n", rqst.length());
+                rqst.clear();
+            }
+        }
     }
     return isComplete();
 }
