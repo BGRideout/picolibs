@@ -79,6 +79,84 @@ uint32_t WS::BuildPacket(enum WebSocketOpCode opcode, const std::string &payload
     return (msg.length());
 }
 
+uint32_t WS::BuildPacket(enum WebSocketOpCode opcode, TXT &msg, bool mask)
+{
+    WebsocketPacketHeader_t header;
+    char                    hdr[16];
+
+    int payloadIndex = 0;
+    
+    // Fill in meta.bits
+    header.meta.bits.FIN = 1;
+    header.meta.bits.RSV = 0;
+    header.meta.bits.OPCODE = opcode;
+    header.meta.bits.MASK = mask & msg.datasize() > 0;
+
+    // Calculate length
+    if (msg.datasize() < 126)
+    {
+        header.meta.bits.PAYLOADLEN = msg.datasize();
+    }
+    else if (msg.datasize() < 0x10000)
+    {
+        header.meta.bits.PAYLOADLEN = 126;
+    }
+    else
+    {
+        header.meta.bits.PAYLOADLEN = 127;
+    }
+
+    hdr[payloadIndex++] = header.meta.bytes.byte0;
+    hdr[payloadIndex++] = header.meta.bytes.byte1;
+ 
+    // Generate mask
+    header.mask.maskKey = (uint32_t)rand();
+    
+    // Fill in payload length
+    if(header.meta.bits.PAYLOADLEN == 126)
+    {
+        hdr[payloadIndex++] = (msg.datasize() >> 8) & 0xFF;
+        hdr[payloadIndex++] = msg.datasize() & 0xFF;
+     }
+
+    if(header.meta.bits.PAYLOADLEN == 127)
+    {
+        hdr[payloadIndex++] = 0; //(msg.datasize() >> 56) & 0xFF;
+        hdr[payloadIndex++] = 0; //(msg.datasize() >> 48) & 0xFF;
+        hdr[payloadIndex++] = 0; //(msg.datasize() >> 40) & 0xFF;
+        hdr[payloadIndex++] = 0; //(msg.datasize() >> 32) & 0xFF;
+        hdr[payloadIndex++] = (msg.datasize() >> 24) & 0xFF;
+        hdr[payloadIndex++] = (msg.datasize() >> 16) & 0xFF;
+        hdr[payloadIndex++] = (msg.datasize() >> 8)  & 0xFF;
+        hdr[payloadIndex++] = msg.datasize() & 0xFF;
+    }
+
+    // Insert masking key
+    if(header.meta.bits.MASK)
+    {
+        const char *mp = (const char *)&header.mask.maskBytes;
+        hdr[payloadIndex++] = *mp++;
+        hdr[payloadIndex++] = *mp++;
+        hdr[payloadIndex++] = *mp++;
+        hdr[payloadIndex++] = *mp++;
+    }
+
+    // Insert header
+    msg.insert(0, hdr, payloadIndex);
+
+    // Mask payload if needed
+    if(header.meta.bits.MASK)
+    {
+        char *payload = msg.data() + payloadIndex;
+        for(uint32_t i = 0; i < msg.datasize(); i++)
+        {
+            payload[i] ^= header.mask.maskBytes[i%4];
+        }
+    }
+
+    return (msg.datasize());
+}
+
 int WS::ParsePacket(WebsocketPacketHeader_t *header, std::string &packet)
 {
     if (packet.length() < 2)

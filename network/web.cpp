@@ -454,7 +454,8 @@ err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
         {
             if (client->more_to_send())
             {
-                web->log_->print_debug(1, "Sending to %d on poll (%d clients)\n", client->handle(), web->clientPCB_.size());
+                web->log_->print_debug(1, "Sending to %d (%s) on poll (%d clients)\n",
+                                       client->handle(), client->isWebSocket() ? "ws" : "http", web->clientPCB_.size());
                 web->write_next(client->pcb());
             }
 
@@ -628,7 +629,7 @@ bool WEB::send_data(ClientHandle client, const char *data, u16_t datalen, Alloca
 
 void WEB::open_websocket(CLIENT &client)
 {
-    log_->print_debug(1, "Accepting websocket connection on %p (handle %d)\n", client.pcb(), client.handle());
+    log_->print_debug(1, "Accepting websocket connection on %p (handle %d) url: %s\n", client.pcb(), client.handle(), client.http().url().c_str());
     std::string host = client.http().header("Host");
     std::string key = client.http().header("Sec-WebSocket-Key");
     
@@ -715,6 +716,26 @@ bool WEB::send_message(ClientHandle client, const std::string &message)
     return clptr != nullptr;
 }
 
+bool WEB::send_message(ClientHandle client, TXT &message)
+{
+    CLIENT *clptr = findClient(client);
+    CLIENT *clpcb = findClient(clptr->pcb());
+    if (clptr && clpcb == clptr)
+    {
+        log_->print_debug(2, "%p (%d) message: %s\n", clptr->pcb(), clptr->handle(), message.data());
+        WS::BuildPacket(WEBSOCKET_OPCODE_TEXT, message, false);
+        char *data = message.data();
+        uint32_t datalen = message.datasize();
+        message.release();
+        send_buffer(clptr->pcb(), data, datalen, WEB::PREALL);
+    }
+    else
+    {
+        log_->print("send_message to non-existent client handle %d (pcb: %p)\n", client, clpcb);
+    }
+    return clptr != nullptr;
+}
+
 void WEB::send_websocket(struct altcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask)
 {
     std::string msg;
@@ -730,6 +751,34 @@ void WEB::broadcast_websocket(const std::string &txt)
         if (it->second->isWebSocket())
         {
             send_websocket(it->second->pcb(), WEBSOCKET_OPCODE_TEXT, txt);
+        }
+    }
+}
+
+void WEB::broadcast_websocket(TXT &txt)
+{
+    CYW43Locker lock;
+    int nwsc = 0;
+    for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
+    {
+        if (it->second->isWebSocket())
+        {
+            nwsc += 1;
+        }
+    }
+    for (auto it = clientHndl_.cbegin(); it != clientHndl_.cend(); ++it)
+    {
+        if (it->second->isWebSocket())
+        {
+            if (--nwsc > 0)
+            {
+                TXT txt1(txt.data(), txt.datasize(), txt.datasize() + 16);
+                send_message(it->first, txt1);
+            }
+            else
+            {
+                send_message(it->first, txt);
+            }
         }
     }
 }

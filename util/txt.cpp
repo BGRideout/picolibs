@@ -66,11 +66,30 @@ TXT &TXT::operator =(const char *assign)
     return *this;
 }
 
+TXT &TXT::operator =(const std::string &assign)
+{
+    size_t la = assign.length();
+    endptr_ = 0;
+    expand(0, la);
+    strncpy(buffer_, assign.c_str(), la);
+    buffer_[endptr_] = 0;
+    return *this;
+}
+
 TXT &TXT::operator +=(const char *append)
 {
     size_t la = strlen(append);
     char *dst = expand(endptr_, la);
     strncpy(dst, append, la);
+    buffer_[endptr_] = 0;
+    return *this;
+}
+
+TXT &TXT::operator +=(const std::string &append)
+{
+    size_t la = append.length();
+    char *dst = expand(endptr_, la);
+    memcpy(dst, append.c_str(), la);
     buffer_[endptr_] = 0;
     return *this;
 }
@@ -85,13 +104,16 @@ uint32_t TXT::find(const char *str) const
     return std::string::npos;
 }
 
-uint32_t TXT::insert(uint32_t offset, const char *str)
+uint32_t TXT::insert(uint32_t offset, const char *str, size_t len)
 {
-    size_t li = strlen(str);
-    expand(offset, li);
-    memcpy(buffer_ + offset, str, li);
+    if (len == 0)
+    {
+        len = strlen(str);
+    }
+    expand(offset, len);
+    memcpy(buffer_ + offset, str, len);
     buffer_[endptr_] = 0;
-    return offset + li;
+    return offset + len;
 }
 
 void TXT::replace(uint32_t offset, uint32_t size, const char *replacement)

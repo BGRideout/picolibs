@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string>
+#include "txt.h"
 
 #define WEBSOCKET_SUCCESS                          ( 0 )
 #define WEBSOCKET_FAIL                             ( -1 )
@@ -77,6 +78,17 @@ class WS {
          * @return  Size of message packet
          */
         static uint32_t BuildPacket(enum WebSocketOpCode opcode, const std::string &payload, std::string &msg, bool mask);
+
+        /**
+         * @brief   Build a websocket message packet
+         * 
+         * @param   opcode  Websocket op-code
+         * @param   msg     TXT object containing message (released before return)
+         * @param   mask    Message to be masked if true
+         * 
+         * @return  Size of message packet
+         */
+        static uint32_t BuildPacket(enum WebSocketOpCode opcode, TXT &msg, bool mask);
 
         /**
          * @brief   Parse a websocket message packet

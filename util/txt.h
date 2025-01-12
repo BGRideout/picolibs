@@ -54,6 +54,7 @@ public:
      * @brief   Return pointer to string
      */
     const char *data() const { return buffer_; }
+    char *data() { return buffer_; }
 
     /**
      * @brief   Return string length
@@ -77,11 +78,13 @@ public:
      * @brief   Assign new value to the string
      */
     TXT &operator =(const char *assign);
+    TXT &operator =(const std::string &assign);
 
     /**
-     * @brief   Append data to te string
+     * @brief   Append data to the string
      */
     TXT &operator +=(const char *append);
+    TXT &operator +=(const std::string &append);
 
     /**
      * @brief   Find a substring
@@ -97,10 +100,11 @@ public:
      * 
      * @param   offset  Offset into contained string to begin insertion
      * @param   str     String to be inserted
+     * @param   len     Length of string (use strlen(str) if zero)
      * 
      * @return  Offset to next character after end of inserted string
      */
-    uint32_t insert(uint32_t offset, const char *str);
+    uint32_t insert(uint32_t offset, const char *str, size_t len=0);
 
     /**
      * @brief   Replace characters in string

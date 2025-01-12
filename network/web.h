@@ -18,6 +18,7 @@ extern "C"
 #include "httprequest.h"
 #include "ws.h"
 #include "logger.h"
+#include "txt.h"
 
 /**
  * @class   WEB
@@ -147,7 +148,7 @@ private:
     public:
         CLIENT(struct altcp_pcb *client_pcb)
          : pcb_(client_pcb), closed_(false), websocket_(false), ws_close_sent_(false)
-          { activity(); handle_ = nextHandle(); }
+          { rqst_.reserve(1024), activity(); handle_ = nextHandle(); }
         ~CLIENT();
 
         void addToRqst(const char *str, u16_t ll);
@@ -395,6 +396,7 @@ public:
      * @param   txt         Message to be sent
      */
     void broadcast_websocket(const std::string &txt);
+    void broadcast_websocket(TXT &txt);
 
     /**
      * @brief   Set callbck to receive notice of connection changes
@@ -456,12 +458,13 @@ public:
      * @brief   Send a text message on websocket
      * 
      * @param   client      Handle of client connection
-     * @param   data        Pointr to data buffer
-     * @param   datalen     Number of bytes to send from data buffer
+     * @param   message     Message to be sent
+     *                      Note: TXT is released
      * 
      * @return  true if send queued successfully
      */
     bool send_message(ClientHandle client, const std::string &message);
+    bool send_message(ClientHandle client, TXT &message);
 
     /**
      * @brief   Enable this device to act as a WiFI access point
