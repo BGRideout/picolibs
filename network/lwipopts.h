@@ -18,8 +18,9 @@
 #if PICO_RP2350
 #define MEM_SIZE                    32768
 #define TCP_WND                     16384
-#define	MEMP_NUM_PBUF               32
+#define	MEMP_NUM_PBUF               64
 #define PBUF_POOL_SIZE              64
+#define PBUF_POOL_BUFSIZE           (1500 + PBUF_LINK_ENCAPSULATION_HLEN + PBUF_LINK_HLEN + PBUF_IP_HLEN + PBUF_TRANSPORT_HLEN)
 #else
 #define MEM_SIZE                    16384
 #define TCP_WND                     16384
