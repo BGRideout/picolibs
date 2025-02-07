@@ -26,6 +26,8 @@ target_sources(bgr_ir_protocols INTERFACE
     nec_transmitter.cpp
     sony_receiver.cpp
     sony_transmitter.cpp
+    samsung_receiver.cpp
+    samsung_transmitter.cpp
     raw_receiver.cpp)
 
 target_link_libraries(bgr_ir_protocols INTERFACE

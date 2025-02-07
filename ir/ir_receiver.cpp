@@ -187,13 +187,17 @@ int64_t IR_Receiver::timeout_bit(alarm_id_t id, void *user_data)
     {
         if (self->n_pulse_ == self->prev_count_ && self->check_bit_timeout())
         {
-            ret = self->timeout(false);
+            if (self->timeout(false))
+            {
+                self->prev_count_ = self->n_pulse_;
+                ret = self->bit_timeout_ * 1000;
+            }
         }
         else
         {
             self->prev_count_ = self->n_pulse_;
+            ret = self->bit_timeout_ * 1000;
         }
-        ret = self->bit_timeout_ * 1000;
     }
     if (ret == 0)
     {
