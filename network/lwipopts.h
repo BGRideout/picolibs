@@ -34,6 +34,7 @@
 #define TCP_SND_BUF                 (8 * TCP_MSS)
 #define TCP_SND_QUEUELEN            ((8 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 #define LWIP_NETIF_STATUS_CALLBACK  1
+#define LWIP_NETIF_EXT_STATUS_CALLBACK 1
 #define LWIP_NETIF_LINK_CALLBACK    1
 #define LWIP_NETIF_HOSTNAME         1
 #define LWIP_NETCONN                0
@@ -93,6 +94,7 @@
 #define LWIP_NUM_NETIF_CLIENT_DATA  1
 #define MEMP_NUM_UDP_PCB            5
 #define MDNS_DEBUG                  LWIP_DBG_OFF
+#define MDNS_RESP_USENETIF_EXTCALLBACK 1
 
 #define MEMP_NUM_SYS_TIMEOUT   (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 16)
 

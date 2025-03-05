@@ -81,10 +81,15 @@ void Sound::startPlaying()
     irq_set_enabled(PWM_IRQ_WRAP, true);
 }
 
-void Sound::stopPlaying()
+void Sound::stopPlaying(bool immediate)
 {
     repeat_ = 0;
     loop_ = false;
+    if (immediate)
+    {
+        idx_ = datasz_;
+        count_ = 0;
+    }
 }
 
 bool Sound::isPlaying() const

@@ -75,8 +75,10 @@ public:
 
     /**
      * @brief   Stop continuous play
+     * 
+     * @param   immediate   Stop playing immediately (next interrupt)
      */
-    void stopPlaying();
+    void stopPlaying(bool immediate = false);
 
     /**
      * @brief   Test if actively playing
