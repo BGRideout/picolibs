@@ -12,7 +12,7 @@
 Sound *Sound::singleton_ = nullptr;
 
 Sound::Sound() : pwm_(nullptr), data_(nullptr), datasz_(0), sample_rate_(22050),
-    idx_(0), slice_num_(0), chan_num_(0), scale_(0), repeat_(0), loop_(false),
+    idx_(0), slice_num_(0), chan_num_(0), scale_(0), volume_(1.0), repeat_(0), loop_(false),
     count_(0), tone_f_(0.0), tone_v_(1.0), tone_p_(0)
 {
 }
@@ -46,19 +46,37 @@ void Sound::setSoundData(const uint8_t *data, uint32_t size, uint32_t sample_rat
     wait();
     data_ = data;
     datasz_ = size;
+    scale();
+}
 
+void Sound::scale()
+{
     //  Calculate scale
-    uint8_t high = data_[0];
-    uint8_t low = high;
-    for (int ii = 1; ii < datasz_ - 1; ii++)
+    if (datasz_ > 0)
     {
-        if (data_[ii] > high) high = data_[ii];
-        if (data_[ii] < low) low = data_[ii];
+        uint8_t high = data_[0];
+        uint8_t low = high;
+        for (int ii = 1; ii < datasz_ - 1; ii++)
+        {
+            if (data_[ii] > high) high = data_[ii];
+            if (data_[ii] < low) low = data_[ii];
+        }
+        float scaleh = (float)(0xff - 0x80) / (float)(high - 0x80);
+        float scalel = (float)(0x80 - 0x00) / (float)(0x80 - low);
+        float scale = scaleh > scalel ? scaleh : scalel;
+        scale_ = (uint16_t)(scale * volume_ * 0x80);
     }
-    float scaleh = (float)(0xff - 0x80) / (float)(high - 0x80);
-    float scalel = (float)(0x80 - 0x00) / (float)(0x80 - low);
-    float scale = scaleh > scalel ? scaleh : scalel;
-    scale_ = (uint16_t)(scale * 0x80);
+    else
+    {
+        scale_ = 0.0;
+    }
+}
+
+void Sound::setVolume(const uint8_t &volume)
+{
+    volume_ = static_cast<float>(volume) / 100.0;
+    if (volume_ > 1.0) volume_ = 1.0;
+    scale();
 }
 
 void Sound::playOnce(uint8_t repeat)

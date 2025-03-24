@@ -19,6 +19,7 @@ private:
     uint32_t            slice_num_;         // PWM slice number
     uint32_t            chan_num_;          // PWM channel number
     uint16_t            scale_;             // Scaling
+    float               volume_;            // Volume
     uint8_t             repeat_;            // Repeat count
     bool                loop_;              // Loop flag
     uint32_t            count_;             // Tone / beep counter
@@ -28,6 +29,7 @@ private:
 
     static void handler();
     void next_pulse();
+    void scale();
 
     Sound();
     ~Sound();
@@ -60,6 +62,17 @@ public:
      * @param   sample_rate Sample rate of sound data
      */
     void setSoundData(const uint8_t *data, uint32_t size, uint32_t sample_rate=22050);
+
+    /**
+     * @brief   Return current volume
+     */
+    uint8_t volume() const { return static_cast<uint8_t>(volume_ * 100.0); }
+    /**
+     * @brief   Set volume
+     * 
+     * @param   volume      Volume (0-100)
+     */
+    void setVolume(const uint8_t &volume);
 
     /**
      * @brief   Play sound file once
