@@ -66,7 +66,7 @@ public:
     /**
      * @brief   Return current volume
      */
-    uint8_t volume() const { return static_cast<uint8_t>(volume_ * 100.0); }
+    uint8_t volume() const { return static_cast<uint8_t>((volume_ + 0.005) * 100.0); }
     /**
      * @brief   Set volume
      * 
