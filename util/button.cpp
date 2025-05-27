@@ -34,7 +34,10 @@ Button::Button(uint32_t id, uint32_t gpio, uint32_t hold_time, uint32_t click_ti
     gpio_init(gpio_);
     gpio_set_dir(gpio_, GPIO_IN);
     gpio_set_pulls(gpio_, true, false);
-    prev_state_ = gpio_get(gpio_);
+    for (int ii = 0; ii < 100; ii++)
+    {
+        prev_state_ = !gpio_get(gpio_); // Equivalent to isDown() - read multiple times to let pull-up happen
+    }
     if (n_button_ == 1)
     {
         queue_init(&queue_, sizeof(struct ButtonEvent), 64);
