@@ -46,6 +46,24 @@ LED::~LED()
     }
 }
 
+bool LED::get_led() const
+{
+    bool ret = false;
+    if (gpio_ == 0xffffffff)
+    {
+#ifdef CYW43_WL_GPIO_LED_PIN
+        cyw43_thread_enter();
+        ret = cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN);
+        cyw43_thread_exit();
+#endif
+    }
+    else
+    {
+        ret = gpio_get(gpio_);
+    }
+    return ret;
+}
+
 void LED::set_led(bool state)
 {
     if (gpio_ == 0xffffffff)

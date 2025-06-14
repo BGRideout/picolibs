@@ -22,6 +22,7 @@ private:
     static int64_t timer_cb(alarm_id_t id, void *udata);
     int64_t do_timer();
     bool check_flash();
+    bool get_led() const;
     void set_led(bool state);
 
 public:
@@ -51,21 +52,21 @@ public:
      * 
      * @param   state   New state of LED (true = on)
      */
-    void setState(bool state) { flash_period_ = 0; gpio_put(gpio_, state); }
+    void setState(bool state) { flash_period_ = 0; set_led(state); }
 
     /**
      * @brief   Assign state of LED
      * 
      * @param   state   RHS is new state of LED (true = on)
      */
-    void operator = (bool state) { flash_period_ = 0; gpio_put(gpio_, state); }
+    void operator = (bool state) { flash_period_ = 0; set_led(state); }
 
     /**
      * @brief   Get current state of LED
      * 
      * @return  Current state of LED
      */
-    bool isOn() const { return gpio_get(gpio_); }
+    bool isOn() const { return get_led(); }
 
     /**
      * @brief   Get flash pattern size
