@@ -20,7 +20,7 @@ IR_LED::IR_LED(uint32_t gpio, uint32_t freq, float duty, uint32_t a_times)
 {
     if (nled_ == 0)
     {
-        pool_ = alarm_pool_create_with_unused_hardware_alarm(MAX_SIM_IR_LED);
+        pool_ = alarm_pool_create_with_unused_hardware_alarm(MAX_SIM_IR_LED+1);
         uint alarm_num = alarm_pool_timer_alarm_num(pool_);
         irq_set_priority(TIMER_ALARM_IRQ_NUM(alarm_pool_get_default_timer(), alarm_num), PICO_HIGHEST_IRQ_PRIORITY);
     }
@@ -73,7 +73,6 @@ bool IR_LED::transmit()
         out_index_ = 0;
         repeat_ = minimum_repeats();
         ret = start();
-        timer_ = alarm_pool_add_alarm_in_us(pool_, 50, timer_cb, this, true);
     }
     return ret;
 }

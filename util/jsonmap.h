@@ -62,7 +62,7 @@ public:
     bool hasProperty(const char *name) const;
 
     /**
-     * @brief   Get the value of a property (string, integer or real)
+     * @brief   Get the value of a property (string, integer, real) or boolean
      * 
      * @param   name    Property name
      * @param   defval  Default value if property not defined
@@ -72,6 +72,7 @@ public:
     const char *strValue(const char *name, const char *defVal=nullptr) const;
     int intValue(const char *name, int defVal=0) const;
     double realValue(const char *name, double defVal=0.0) const;
+    bool boolValue(const char *name, bool defVal=false) const;
 
     /**
      * @brief   Create JSON string from a std::map of keys and values

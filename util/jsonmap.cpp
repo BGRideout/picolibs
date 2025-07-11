@@ -98,6 +98,17 @@ double JSONMap::realValue(const char *name, double defVal) const
     return ret;
 }
 
+bool JSONMap::boolValue(const char *name, bool defVal) const
+{
+    bool ret = defVal;
+    const json_t *prop = findProperty(name);
+    if (prop)
+    {
+        ret = json_getBoolean(prop);
+    }
+    return ret;
+}
+
 bool JSONMap::fromMap(const JMAP &jmap, std::string &str)
 {
     bool ret = false;
